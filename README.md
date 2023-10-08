@@ -21,13 +21,13 @@ A | 1  -  3  4  5  6  |
 B | 1  2  3  4  5  6  |
   ---------------------
 
-A1 - Power GND
-B1 - Power Vcc
-B2 - NC
- 3: Addr0
- 4: Addr1
- 5: Addr2
- 6: Addr3
+A1: power GND
+B1: power Vcc
+B2: N/C
+ 3: address bit 0
+ 4: address bit 1
+ 5: address bit 2
+ 6: address bit 3
 ```
 
 X2:
@@ -38,15 +38,15 @@ Y | 1 2 3 |
 X | 1 2 3 |
   ---------
 
-X1: RS485 IN-
-X2: RS485 IN+
-Y1: RS485 OUT-
-Y2: RS485 OUT+
- 3: GND
+X1: RS-485 in-
+X2: RS-485 in+
+Y1: RS-485 out-
+Y2: RS-485 out+
+ 3: RS-485 GND
 ```
 
 Connect a 60-140V DC power supply to pins B1 and A1, and bridge the address pin pairs as desired (or leave them all unbridged for ID 0).
-Connect a RS485 transceiver to pins X1, X2, and X3, and a 120 ohm terminating resistor between Y1 and Y2.
+Connect a RS-485 transceiver to pins X1, X2, and X3, and a 120 ohm terminating resistor between Y1 and Y2.
 
 Now, use any of the display subcommands to talk to the device, passing the path to your serial device using `-d` and the device address using `-i`:
 
@@ -69,6 +69,8 @@ stats:
   sensors: 19; EnvermentBrightness følger: %d mV
 
 ```
+
+If this does not work, check your address pins and RS-485 connectivity. To make sure your display works at all, try bridging all adress pin pairs: upon startup, the display should then enter self-test mode.
 
 ## License
 
