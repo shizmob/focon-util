@@ -1,7 +1,8 @@
 # `focon-util`
 
-Utility and library to talk to industiral devices from Focon Electronics Systems A/S,
-as used in the Stadsgewestelijk Materieel-gemoderniseerd (SGMm) train operated by the Dutch railway company Nationale Spoorwegen (NS).
+Utility and library to talk to industrial devices from Focon Electronics Systems A/S, as used in:
+* Stadsgewestelijk Materieel-gemoderniseerd (SGMm) operated by the Dutch railway company Nationale Spoorwegen (NS);
+* Various trains operated by the Danish railway company Danske Statsbaner (DSB);
 
 ## Installation
 
