@@ -59,6 +59,11 @@ class FoconBus:
 				LOG.debug('<< frame: %r', frame)
 			except EOFError:
 				continue
+			except:
+				LOG.warn('Error parsing frame data %s, discarding', self.pending_data.hex())
+				self.pending_data = b''
+				continue
+
 			if frame.dest_id not in (self.src_id, None):
 				continue
 			self.pending_frames.append(frame)

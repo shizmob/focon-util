@@ -49,9 +49,15 @@ class FoconFrame:
 
 	@classmethod
 	def unpack(cls, data: bytes) -> tuple['FoconFrame', bytes]:
-		preamble, data = take(data, len(cls.PREAMBLE))
-		if preamble != cls.PREAMBLE:
-			raise ValueError(f'invalid preamble: {preamble!r}')
+		odata = data
+
+		while data and data[0] == 0xff:
+			data = data[1:]
+		if not data:
+			raise EOFError()
+		if data[0] != 1:
+			raise ValueError(f'invalid preamble: {odata!r}')
+		data = data[1:]
 		cdata = data
 
 		(src, dest, total, num, pdata_length), data = take_unpack(data, '>ccBBH')
