@@ -66,7 +66,7 @@ class FoconMessageBus:
 		try:
 			message, _ = FoconMessage.unpack(data)
 		except Exception as e:
-			LOG.exception(f'Could not parse message from {data}')
+			LOG.exception('Could not parse message from %r', data)
 			return False
 		return dest_id in (message.src_id, None) and message.dest_id in (self.src_id, None) and cmd in (None, message.cmd)
 
@@ -74,8 +74,10 @@ class FoconMessageBus:
 		LOG.debug('>> msg: %r', message)
 		return self.bus.send_frame(dest_id, message.pack())
 
-	def recv_message(self, dest_id: int | None, cmd: int | None = None) -> FoconMessage | None:
+	def recv_message(self, dest_id: int | None, cmd: int | None = None) -> FoconMessage:
 		data = self.bus.recv_frame(partial(self.check_message, dest_id, cmd))
+		assert data is not None
+
 		msg, remainder_data = FoconMessage.unpack(data)
 		LOG.debug('<< msg: %r', msg)
 		if remainder_data:

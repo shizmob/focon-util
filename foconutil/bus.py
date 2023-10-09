@@ -12,11 +12,11 @@ LOG = getLogger(__name__)
 class FoconBus:
 	BAUDRATE = 57600
 
-	def __init__(self, device: str, src_id: int | None = None, sleep_after_tx: float | None = 0.0002) -> None:
+	def __init__(self, device: str, src_id: int, sleep_after_tx: float | None = 0.0002) -> None:
 		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=True)
 		self.src_id = src_id
 		self.pending_data = b''
-		self.pending_frames: dict[int, FoconFrame] = {}
+		self.pending_frames: dict[int, list[FoconFrame]] = {}
 		self.serial.reset_output_buffer()
 		self.serial.reset_input_buffer()
 		self.sleep_after_tx = sleep_after_tx
@@ -41,7 +41,12 @@ class FoconBus:
 		LOG.debug('>> frame: %r', frame)
 		self.send_data(frame.pack())
 
-	def recv_frame(self, checker: Callable[[bytes | None], bool] | None = None) -> bytes:
+	def send_ack(self, dest_id: int) -> None:
+		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
+		LOG.debug('>> ack: %r', dest_id)
+		self.send_data(frame.pack())
+
+	def recv_frame(self, checker: Callable[[bytes | None], bool] | None = None) -> bytes | None:
 		while True:
 			found = False
 			for src_id, frames in self.pending_frames.items():
@@ -75,16 +80,18 @@ class FoconBus:
 			if frame.dest_id not in (self.src_id, None):
 				continue
 			self.pending_frames.setdefault(frame.src_id, []).append(frame)
+			if frame.num < frame.total:
+				self.send_ack(frame.src_id)
 
 	def recv_next_frame(self, dest_id: int | None, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
 		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
 		LOG.debug('>> frame: %r', frame)
 		self.send_data(frame.pack())
 
-		def inner_checker(data):
+		def inner_checker(data: bytes | None) -> bool:
 			if data is None:
 				return True
-			return checker(data)
+			return not checker or checker(data)
 		data = self.recv_frame(inner_checker)
 		if not data:
 			return None

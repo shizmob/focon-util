@@ -26,7 +26,7 @@ class FoconFrame:
 		reverse_output=False,
 	)
 
-	src_id:  int | None
+	src_id:  int
 	dest_id: int | None
 	num:     int
 	total:   int
@@ -80,6 +80,7 @@ class FoconFrame:
 		if postamble != cls.POSTAMBLE:
 			raise ValueError(f'invalid postamble: {postamble!r}')
 
+		assert src_id is not None
 		return cls(src_id=src_id, dest_id=dest_id, num=num, total=total, data=pdata), data
 
 	def __repr__(self) -> str:
