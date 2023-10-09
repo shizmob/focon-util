@@ -69,7 +69,7 @@ class FoconMessageBus:
 			try:
 				message, _ = FoconMessage.unpack(frame.data)
 			except Exception as e:
-				print(f'Could not parse {frame}: {e!r}')
+				LOG.exception(f'Could not parse message from {frame}')
 				return False
 			return message.dest_id in (self.src_id, None) and cmd in (None, message.cmd)
 
