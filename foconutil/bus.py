@@ -1,6 +1,7 @@
 from typing import Callable, Protocol
 from logging import getLogger
 
+from math import ceil
 from time import sleep
 from serial import Serial
 
@@ -48,9 +49,15 @@ class FoconBus:
 		self.pending_frames: dict[int, list[FoconFrame]] = {}
 
 	def send_frame(self, dest_id: int | None, data: bytes) -> None:
-		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=1, total=1, data=data)
-		LOG.debug('>> frame: %r', frame)
-		self.transport.write(frame.pack())
+		max_frame_size = 512
+		nframes = ceil(len(data) / max_frame_size)
+		for i in range(nframes):
+			frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=i + 1, total=nframes, data=data[i * max_frame_size:(i + 1) * max_frame_size])
+			LOG.debug('>> frame: %r', frame)
+			self.transport.write(frame.pack())
+			if (i + 1) < nframes:
+				assert dest_id is not None
+				self.recv_ack(dest_id)
 
 	def send_ack(self, dest_id: int) -> None:
 		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
@@ -93,6 +100,9 @@ class FoconBus:
 			self.pending_frames.setdefault(frame.src_id, []).append(frame)
 			if frame.num < frame.total:
 				self.send_ack(frame.src_id)
+
+	def recv_ack(self, dest_id: int) -> None:
+		self.recv_frame(lambda data: data is None)
 
 	def recv_next_frame(self, dest_id: int, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
 		self.send_ack(dest_id)
