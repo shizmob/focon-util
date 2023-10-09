@@ -130,11 +130,16 @@ def main() -> None:
         get_task_stats_parser = display_subcommands.add_parser('task-stats')
         get_task_stats_parser.set_defaults(_display_handler=do_display_task_stats)
 
+        SELFTEST_TYPES = {
+                'info': FoconDisplaySelfTestKind.Info,
+                'flood': FoconDisplaySelfTestKind.Flood,
+                'abort': FoconDisplaySelfTestKind.Abort,
+        }
         def do_display_selftest(display, args):
-                print(display.trigger_selftest(args.type))
+                print(display.trigger_selftest(SELFTEST_TYPES[args.type]))
         selftest_parser = display_subcommands.add_parser('selftest')
         selftest_parser.set_defaults(_display_handler=do_display_selftest)
-        selftest_parser.add_argument('type', type=int)
+        selftest_parser.add_argument('type', choices=tuple(SELFTEST_TYPES))
 
         def do_display_status(display, args):
                 print(display.get_status())

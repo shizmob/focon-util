@@ -233,6 +233,12 @@ class FoconDisplayProductInfo:
 			unk1_value=unpack('>I', data[66:70])[0],
 		)
 
+
+class FoconDisplaySelfTestKind(Enum):
+	Info = 1
+	Flood = 2
+	Abort = 3
+
 class FoconDisplayError(Flag):
 	Unk00         = (1 << 0)
 	Watchdog      = (1 << 1)
@@ -326,9 +332,9 @@ class FoconDisplay:
 		response = self.send_command(FoconDisplayCommand.Status)
 		return FoconDisplayStatus.unpack(response)
 
-	def trigger_selftest(self, type: int) -> bool:
-		response = self.send_command(FoconDisplayCommand.SelfTest, bytes([type, 0x00]))
-		if response[0] != type:
+	def trigger_selftest(self, type: FoconDisplaySelfTestKind) -> bool:
+		response = self.send_command(FoconDisplayCommand.SelfTest, bytes([type.value, 0x00]))
+		if response[0] != type.value:
 			raise ValueError(f'got invalid selftest type response {response[0]} != {type}')
 		return response[1] == 0xff
 
