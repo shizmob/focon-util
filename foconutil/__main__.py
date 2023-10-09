@@ -25,7 +25,7 @@ def do_test(args):
                 def send_frame(self, dest_id: int | None, data: bytes) -> None:
                         pass
 
-                def recv_frame(self, checker=None) -> FoconFrame:
+                def recv_frame(self, checker=None) -> bytes:
                         while True:
                                 found = False
                                 for f in self.frames:
@@ -35,7 +35,7 @@ def do_test(args):
 
                                 if found:
                                         self.frames.remove(f)
-                                        return f
+                                        return f.data
 
         rp, _ = FoconFrame.unpack(bytes.fromhex('ff ff ff 01 49 2a 01 01 00 12 49 30 00 00 49 30 00 08 00 41 46 41 31 30 31 31 33 30 8c 03 ff ff'))
         rp.dest_id = args.source_id

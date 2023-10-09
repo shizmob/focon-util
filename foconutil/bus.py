@@ -16,7 +16,7 @@ class FoconBus:
 		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=True)
 		self.src_id = src_id
 		self.pending_data = b''
-		self.pending_frames: list[FoconFrame] = []
+		self.pending_frames: dict[int, FoconFrame] = {}
 		self.serial.reset_output_buffer()
 		self.serial.reset_input_buffer()
 		self.sleep_after_tx = sleep_after_tx
@@ -41,17 +41,25 @@ class FoconBus:
 		LOG.debug('>> frame: %r', frame)
 		self.send_data(frame.pack())
 
-	def recv_frame(self, checker: Callable[[FoconFrame], bool] | None = None) -> FoconFrame:
+	def recv_frame(self, checker: Callable[[bytes | None], bool] | None = None) -> bytes:
 		while True:
 			found = False
-			for p in self.pending_frames:
-				if not checker or checker(p):
+			for src_id, frames in self.pending_frames.items():
+				if not frames:
+					continue
+				if frames[-1].total not in (0, len(frames)):
+					continue
+				if frames[-1].total == 0:
+					frame_data = None
+				else:
+					frame_data = b''.join(f.data for f in sorted(frames, key=lambda f: f.num))
+				if not checker or checker(frame_data):
 					found = True
 					break
 
 			if found:
-				self.pending_frames.remove(p)
-				return p
+				del self.pending_frames[src_id]
+				return frame_data
 
 			self.pending_data += self.recv_data()
 			try:
@@ -66,17 +74,18 @@ class FoconBus:
 
 			if frame.dest_id not in (self.src_id, None):
 				continue
-			self.pending_frames.append(frame)
+			self.pending_frames.setdefault(frame.src_id, []).append(frame)
 
-	def recv_next_frame(self, dest_id: int | None, checker: Callable[[FoconFrame], bool] | None) -> FoconFrame | None:
+	def recv_next_frame(self, dest_id: int | None, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
 		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
 		LOG.debug('>> frame: %r', frame)
 		self.send_data(frame.pack())
-		def inner_checker(frame):
-			if not frame.data:
+
+		def inner_checker(data):
+			if data is None:
 				return True
-			return checker(frame)
-		frame = self.recv_frame(inner_checker)
-		if not frame.data:
+			return checker(data)
+		data = self.recv_frame(inner_checker)
+		if not data:
 			return None
-		return frame
+		return data

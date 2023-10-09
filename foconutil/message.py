@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from struct import pack
 
 from .util import take, take_unpack
-from .frame import FoconFrame
 from .bus import FoconBus
 
 LOG = getLogger(__name__)
@@ -61,11 +60,13 @@ class FoconMessageBus:
 		self.bus = frame_bus
 		self.src_id = src_id
 
-	def check_frame(self, dest_id: int | None, cmd: int | None, frame: FoconFrame) -> bool:
+	def check_message(self, dest_id: int | None, cmd: int | None, data: bytes | None) -> bool:
+		if data is None:
+			return False
 		try:
-			message, _ = FoconMessage.unpack(frame.data)
+			message, _ = FoconMessage.unpack(data)
 		except Exception as e:
-			LOG.exception(f'Could not parse message from {frame}')
+			LOG.exception(f'Could not parse message from {data}')
 			return False
 		return dest_id in (message.src_id, None) and message.dest_id in (self.src_id, None) and cmd in (None, message.cmd)
 
@@ -74,8 +75,8 @@ class FoconMessageBus:
 		return self.bus.send_frame(dest_id, message.pack())
 
 	def recv_message(self, dest_id: int | None, cmd: int | None = None) -> FoconMessage | None:
-		frame = self.bus.recv_frame(partial(self.check_frame, dest_id, cmd))
-		msg, remainder_data = FoconMessage.unpack(frame.data)
+		data = self.bus.recv_frame(partial(self.check_message, dest_id, cmd))
+		msg, remainder_data = FoconMessage.unpack(data)
 		LOG.debug('<< msg: %r', msg)
 		if remainder_data:
 			raise ValueError(f'Remainder data: {remainder_data!r}')
@@ -83,13 +84,13 @@ class FoconMessageBus:
 
 	def recv_messages(self, dest_id: int | None, cmd: int | None = None) -> list[FoconMessage]:
 		messages = []
-		checker = partial(self.check_frame, dest_id, cmd)
+		checker = partial(self.check_message, dest_id, cmd)
 
 		while True:
-			frame = self.bus.recv_next_frame(dest_id, checker)
-			if not frame:
+			data = self.bus.recv_next_frame(dest_id, checker)
+			if not data:
 				break
-			msg, remainder_data = FoconMessage.unpack(frame.data)
+			msg, remainder_data = FoconMessage.unpack(data)
 			LOG.debug('<< msg: %r', msg)
 			if remainder_data:
 				raise ValueError(f'Remainder data: {remainder_data!r}')
