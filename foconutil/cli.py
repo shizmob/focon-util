@@ -5,7 +5,7 @@ from . import FoconFrame, FoconBus, FoconMessageBus, FoconDisplay
 from .devices.display import *
 
 
-def main():
+def main() -> None:
         p = argparse.ArgumentParser()
         p.add_argument('-d', '--device', default='/dev/ttyUSB0', help='bus device')
         p.add_argument('-D', '--debug', action='store_true', help='debug log')
