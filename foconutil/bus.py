@@ -14,7 +14,7 @@ class FoconBus:
 
 	def __init__(self, device: str, src_id: int | None = None, sleep_after_tx: float | None = 0.005) -> None:
 		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=True)
-		self.src_id = None
+		self.src_id = src_id
 		self.pending_data = b''
 		self.pending_frames: list[FoconFrame] = []
 		self.serial.reset_output_buffer()

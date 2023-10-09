@@ -13,7 +13,7 @@ LOG = getLogger(__name__)
 
 @dataclass
 class FoconMessage:
-	ID_MAP: ClassVar[dict[int | None, bytes]] = {i: 'I{}'.format(i).encode('ascii') for i in range(16)}
+	ID_MAP: ClassVar[dict[int | None, bytes]] = {i: 'I{:x}'.format(i).encode('ascii') for i in range(16)}
 	ID_MAP[None] = b'I*'
 	REVERSE_ID_MAP = {v: k for k, v in ID_MAP.items()}
 
@@ -58,7 +58,7 @@ class FoconMessage:
 class FoconMessageBus:
 	def __init__(self, frame_bus: FoconBus, src_id: int | None = None) -> None:
 		self.bus = frame_bus
-		self.src_id = 0
+		self.src_id = src_id
 
 	def send_message(self, dest_id: int | None, message: FoconMessage) -> None:
 		LOG.debug('>> msg: %r', message)
