@@ -1,5 +1,5 @@
 from typing import Callable, Iterator, Any
-from struct import unpack
+from struct import pack, unpack
 from dataclasses import dataclass
 from enum import Enum, Flag
 
@@ -17,7 +17,7 @@ class FoconDisplayCommand(Enum):
 	SetUnk47     = 0x0047
 	DispUnk48    = 0x0048
 	DispUnk49    = 0x0049
-	DispUnk4A    = 0x004A
+	DrawString   = 0x004A
 	# 0x4B is not defined
 	DispUnk4C    = 0x004C
 	DispUnk4D    = 0x004D
@@ -268,8 +268,8 @@ class FoconDisplayStatus:
 	hw_ipc_val_3: int
 	hw_ipc_val_res: int
 	sensor4_value: int
-	unk11_avail: int
-	unk12_avail: int
+	unk1x_abv_avail: int
+	unk1x_dlru_avail: int
 	unk2a_valid: int
 	unk2a_value: bytes
 	unk2b_valid: int
@@ -287,12 +287,90 @@ class FoconDisplayStatus:
 			unk1_3=data[8],
 			hw_ipc_val_res=data[9], # status5
 			brightness_sensor=bool(data[10]), # status1
-			unk11_avail=data[11], # status7
-			unk12_avail=data[12], # status8
+			unk1x_abv_avail=data[11], # status7
+			unk1x_dlru_avail=data[12], # status8
 			unk2a_valid=bool(data[14]),
 			unk2a_value=data[15:38],
 			unk2b_valid=bool(data[38]),
 			unk2b_value=data[39:62],
+		)
+
+class FoconDisplayDrawKind(Enum):
+	UnkN = 'N'
+	UnkA = 'A'
+
+class FoconDisplayDrawDirection(Enum):
+	UnkU = 'U'
+	UnkD = 'D'
+	LeftScroll = 'L'
+	RightScroll = 'R'
+	Still = 'A'
+	FlashDisappear = 'B'
+	FlashStill = 'V'
+
+@dataclass
+class FoconDisplayDrawCommand:
+	id:        int
+	kind:      FoconDisplayDrawKind
+	x_start:   int
+	y_start:   int
+	x_end:     int
+	y_end:     int
+	direction: FoconDisplayDrawDirection
+	unk0B:     int
+	output_id: int
+	unk0D:     int
+	unk0E:     int
+	unk0F:     int
+	flags:     int
+	sub_id:     int
+	data:      bytes
+
+	def pack(self) -> bytes:
+		return (bytes([self.id, ord(self.kind.value)]) +
+		        pack('>HHHH', self.x_start, self.y_start, self.x_end, self.y_end) +
+		        bytes([ord(self.direction.value), self.unk0B, self.output_id, self.unk0D, self.unk0E, self.unk0F, self.flags, self.sub_id]) +
+		        self.data)
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'FoconDisplayDrawCommand':
+		x_start, y_start, x_end, y_end = unpack('>HHHH', data[2:10])
+		return cls(
+			id=data[0],
+			kind=FoconDisplayDrawKind(chr(data[1])),
+			x_start=x_start,
+			y_start=y_start,
+			x_end=x_end,
+			y_end=y_end,
+			direction=FoconDisplayDrawDirection(chr(data[10])),
+			unk0B=data[11],
+			output_id=data[12],
+			unk0D=data[13],
+			unk0E=data[14],
+			unk0F=data[15],
+			flags=data[16],
+			sub_id=data[17],
+			data=data[18:],
+		)
+
+	@classmethod
+	def make_print(cls, output_id: int, message: str) -> 'FoconDisplayDrawCommand':
+		return cls(
+			id=0xFF,
+			kind=FoconDisplayDrawKind.UnkN,
+			x_start=0,
+			y_start=0,
+			x_end=207,
+			y_end=31,
+			direction=FoconDisplayDrawDirection.Still,
+			unk0B=1,
+			output_id=1,
+			unk0D=18,
+			unk0E=ord('2'),
+			unk0F=ord('Q'),
+			flags=4,
+			sub_id=16,
+			data=(message.encode('iso-8859-1') + b'\x00') if isinstance(message, str) else message,
 		)
 
 def dangerous(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -323,6 +401,10 @@ class FoconDisplay:
 	def get_boot_info(self) -> FoconDisplayBootInfo:
 		response = self.send_command(FoconDisplayCommand.BootInfo)
 		return FoconDisplayBootInfo.unpack(response)
+
+	def print(self, message: str) -> bytes:
+		cmd = FoconDisplayDrawCommand.make_print(0, message)
+		self.send_command(FoconDisplayCommand.DrawString, cmd.pack())
 
 	@dangerous
 	def self_destruct(self) -> None:
