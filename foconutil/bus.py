@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Protocol
 from logging import getLogger
 
 from time import sleep
@@ -9,19 +9,29 @@ from .frame import FoconFrame
 LOG = getLogger(__name__)
 
 
-class FoconBus:
+class FoconTransport(Protocol):
+	def read(self) -> bytes:
+		...
+
+	def write(self, data: bytes) -> None:
+		...
+
+class FoconSerialTransport(FoconTransport):
 	BAUDRATE = 57600
 
-	def __init__(self, device: str, src_id: int, sleep_after_tx: float | None = 0.0002) -> None:
+	def __init__(self, device: str, sleep_after_tx: float | None = 0.0002) -> None:
 		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=True)
-		self.src_id = src_id
-		self.pending_data = b''
-		self.pending_frames: dict[int, list[FoconFrame]] = {}
+		self.sleep_after_tx = sleep_after_tx
 		self.serial.reset_output_buffer()
 		self.serial.reset_input_buffer()
-		self.sleep_after_tx = sleep_after_tx
 
-	def send_data(self, data: bytes) -> None:
+	def read(self) -> bytes:
+		self.serial.setRTS(0)
+		data: bytes = self.serial.read()
+		LOG.debug('<<: %s', data.hex())
+		return data
+
+	def write(self, data: bytes) -> None:
 		LOG.debug('>>: %s', data.hex())
 		self.serial.setRTS(1)
 		self.serial.write(data)
@@ -30,21 +40,22 @@ class FoconBus:
 			sleep(self.sleep_after_tx * len(data))
 		self.serial.setRTS(0)
 
-	def recv_data(self) -> bytes:
-		self.serial.setRTS(0)
-		data: bytes = self.serial.read()
-		LOG.debug('<<: %s', data.hex())
-		return data
+class FoconBus:
+	def __init__(self, transport: FoconTransport, src_id: int) -> None:
+		self.transport = transport
+		self.src_id = src_id
+		self.pending_data = b''
+		self.pending_frames: dict[int, list[FoconFrame]] = {}
 
 	def send_frame(self, dest_id: int | None, data: bytes) -> None:
 		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=1, total=1, data=data)
 		LOG.debug('>> frame: %r', frame)
-		self.send_data(frame.pack())
+		self.transport.write(frame.pack())
 
 	def send_ack(self, dest_id: int) -> None:
 		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
 		LOG.debug('>> ack: %r', dest_id)
-		self.send_data(frame.pack())
+		self.transport.write(frame.pack())
 
 	def recv_frame(self, checker: Callable[[bytes | None], bool] | None = None) -> bytes | None:
 		while True:
@@ -66,7 +77,7 @@ class FoconBus:
 				del self.pending_frames[src_id]
 				return frame_data
 
-			self.pending_data += self.recv_data()
+			self.pending_data += self.transport.read()
 			try:
 				frame, self.pending_data = FoconFrame.unpack(self.pending_data)
 				LOG.debug('<< frame: %r', frame)
@@ -83,10 +94,8 @@ class FoconBus:
 			if frame.num < frame.total:
 				self.send_ack(frame.src_id)
 
-	def recv_next_frame(self, dest_id: int | None, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
-		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
-		LOG.debug('>> frame: %r', frame)
-		self.send_data(frame.pack())
+	def recv_next_frame(self, dest_id: int, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
+		self.send_ack(dest_id)
 
 		def inner_checker(data: bytes | None) -> bool:
 			if data is None:

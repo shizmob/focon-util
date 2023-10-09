@@ -84,7 +84,7 @@ class FoconMessageBus:
 			raise ValueError(f'Remainder data: {remainder_data!r}')
 		return msg
 
-	def recv_messages(self, dest_id: int | None, cmd: int | None = None) -> list[FoconMessage]:
+	def recv_messages(self, dest_id: int, cmd: int | None = None) -> list[FoconMessage]:
 		messages = []
 		checker = partial(self.check_message, dest_id, cmd)
 

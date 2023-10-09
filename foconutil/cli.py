@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from . import FoconFrame, FoconBus, FoconMessageBus, FoconDisplay
+from . import FoconFrame, FoconSerialTransport, FoconBus, FoconMessageBus, FoconDisplay
 from .devices.display import *
 
 
@@ -57,7 +57,7 @@ def main() -> None:
         # Display subcommands
 
         def do_display(args):
-                bus = FoconMessageBus(FoconBus(args.device, args.source_id), args.source_id)
+                bus = FoconMessageBus(FoconBus(FoconSerialTransport(args.device), args.source_id), args.source_id)
                 display = FoconDisplay(bus, args.id)
                 args._display_handler(display, args)
         display_parser = subcommands.add_parser('display')
