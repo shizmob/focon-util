@@ -86,6 +86,10 @@ def do_display_info(display, args):
         print('  sensors:', display.get_sensor_stats())
         print()
 
+        print('tasks:')
+        for t in display.get_task_stats():
+                print('  ' + t)
+
 get_info_parser = display_subcommands.add_parser('info')
 get_info_parser.set_defaults(_display_handler=do_display_info)
 

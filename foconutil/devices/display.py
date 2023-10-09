@@ -309,9 +309,9 @@ class FoconDisplay:
 		response = self.send_command(FoconDisplayCommand.Dump, bytes([type.value, 0x00]))
 		return self.parse_dump_response(type, response)
 
-	def recv_dump_message(self, type: FoconDisplayDumpType) -> str:
-		response = self.bus.recv_message(cmd=FoconDisplayCommand.Dump.value).value
-		return self.parse_dump_response(type, response)
+	def recv_dump_messages(self, type: FoconDisplayDumpType) -> Iterator[str]:
+		for msg in self.bus.recv_messages(self.dest_id, cmd=FoconDisplayCommand.Dump.value):
+			yield self.parse_dump_response(type, msg.value)
 
 
 	def get_boot_info(self) -> FoconDisplayBootInfo:
@@ -370,9 +370,8 @@ class FoconDisplay:
 		return self.do_dump(FoconDisplayDumpType.NetworkStats)
 
 	def get_task_stats(self) -> Iterator[str]:
-		yield self.do_dump(FoconDisplayDumpType.TaskStats)
-		while True:
-			yield self.recv_dump_message(FoconDisplayDumpType.TaskStats)
+		self.do_dump(FoconDisplayDumpType.TaskStats)
+		yield from self.recv_dump_messages(FoconDisplayDumpType.TaskStats)
 
 	def get_sensor_stats(self) -> str:
 		return self.do_dump(FoconDisplayDumpType.EnvironmentBrightness)
