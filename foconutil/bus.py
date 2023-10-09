@@ -12,7 +12,7 @@ LOG = getLogger(__name__)
 class FoconBus:
 	BAUDRATE = 57600
 
-	def __init__(self, device: str, src_id: int | None = None, sleep_after_tx: float | None = 0.005) -> None:
+	def __init__(self, device: str, src_id: int | None = None, sleep_after_tx: float | None = 0.0002) -> None:
 		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=True)
 		self.src_id = src_id
 		self.pending_data = b''
@@ -27,7 +27,7 @@ class FoconBus:
 		self.serial.write(data)
 		self.serial.flush()
 		if self.sleep_after_tx:
-			sleep(self.sleep_after_tx)
+			sleep(self.sleep_after_tx * len(data))
 		self.serial.setRTS(0)
 
 	def recv_data(self) -> bytes:
