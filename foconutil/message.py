@@ -1,6 +1,7 @@
 from typing import ClassVar
 from logging import getLogger
 
+from functools import partial
 from dataclasses import dataclass
 from struct import pack
 
@@ -60,28 +61,44 @@ class FoconMessageBus:
 		self.bus = frame_bus
 		self.src_id = src_id
 
+	def check_frame(self, dest_id: int | None, cmd: int | None, frame: FoconFrame) -> bool:
+		try:
+			message, _ = FoconMessage.unpack(frame.data)
+		except Exception as e:
+			LOG.exception(f'Could not parse message from {frame}')
+			return False
+		return dest_id in (message.src_id, None) and message.dest_id in (self.src_id, None) and cmd in (None, message.cmd)
+
 	def send_message(self, dest_id: int | None, message: FoconMessage) -> None:
 		LOG.debug('>> msg: %r', message)
 		return self.bus.send_frame(dest_id, message.pack())
 
-	def recv_message(self, cmd: int | None = None) -> FoconMessage:
-		def checker(frame: FoconFrame) -> bool:
-			try:
-				message, _ = FoconMessage.unpack(frame.data)
-			except Exception as e:
-				LOG.exception(f'Could not parse message from {frame}')
-				return False
-			return message.dest_id in (self.src_id, None) and cmd in (None, message.cmd)
-
-		frame = self.bus.recv_frame(checker)
+	def recv_message(self, dest_id: int | None, cmd: int | None = None) -> FoconMessage | None:
+		frame = self.bus.recv_frame(partial(self.check_frame, dest_id, cmd))
 		msg, remainder_data = FoconMessage.unpack(frame.data)
 		LOG.debug('<< msg: %r', msg)
 		if remainder_data:
 			raise ValueError(f'Remainder data: {remainder_data!r}')
 		return msg
 
+	def recv_messages(self, dest_id: int | None, cmd: int | None = None) -> list[FoconMessage]:
+		messages = []
+		checker = partial(self.check_frame, dest_id, cmd)
+
+		while True:
+			frame = self.bus.recv_next_frame(dest_id, checker)
+			if not frame:
+				break
+			msg, remainder_data = FoconMessage.unpack(frame.data)
+			LOG.debug('<< msg: %r', msg)
+			if remainder_data:
+				raise ValueError(f'Remainder data: {remainder_data!r}')
+			messages.append(msg)
+
+		return messages
+
 	def send_command(self, dest_id: int | None, command: int, payload: bytes=b'') -> bytes:
 		message = FoconMessage(src_id=self.src_id, dest_id=dest_id, cmd=command, value=payload)
 		self.send_message(dest_id, message)
-		reply_message = self.recv_message(cmd=command)
+		reply_message = self.recv_message(dest_id, cmd=command)
 		return reply_message.value

@@ -68,3 +68,15 @@ class FoconBus:
 				continue
 			self.pending_frames.append(frame)
 
+	def recv_next_frame(self, dest_id: int | None, checker: Callable[[FoconFrame], bool] | None) -> FoconFrame | None:
+		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
+		LOG.debug('>> frame: %r', frame)
+		self.send_data(frame.pack())
+		def inner_checker(frame):
+			if not frame.data:
+				return True
+			return checker(frame)
+		frame = self.recv_frame(inner_checker)
+		if not frame.data:
+			return None
+		return frame
