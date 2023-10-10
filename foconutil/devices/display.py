@@ -259,21 +259,18 @@ class FoconDisplayError(Flag):
 
 @dataclass
 class FoconDisplayStatus:
-	error_flags:          FoconDisplayError
-	temperature:          float
-	mode:                 int
-	brightness_available: bool
-	brightness_average:   int
-	unk1_3:         int
-	hw_ipc_val_3:   int
-	hw_ipc_val_res: int
-	sensor4_value:  int
+	error_flags:              FoconDisplayError
+	temperature:              float
+	mode:                     int
+	brightness_average:       int | None
+	unk1_3:                   int
+	hw_ipc_val_3:             int
+	hw_ipc_val_res:           int
+	sensor4_value:            int
 	available_still_objects:  int
 	available_scroll_objects: int
-	unk2a_valid: int
-	unk2a_value: bytes
-	unk2b_valid: int
-	unk2b_value: bytes
+	unk2a:                    bytes | None
+	unk2b:                    bytes | None
 
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayStatus':
@@ -282,17 +279,14 @@ class FoconDisplayStatus:
 			temperature=unpack('>H', data[2:4])[0] / 10,
 			mode=data[4], # status0
 			sensor4_value=data[5], # status6
-			brightness_average=data[6], # status2
+			brightness_average=data[6] if bool(data[10]) else None, # status2, status1
 			hw_ipc_val_3=data[7], # status4
 			unk1_3=data[8],
 			hw_ipc_val_res=data[9], # status5
-			brightness_available=bool(data[10]), # status1
 			available_still_objects=data[11], # status7
 			available_scroll_objects=data[12], # status8
-			unk2a_valid=bool(data[14]),
-			unk2a_value=data[15:38],
-			unk2b_valid=bool(data[38]),
-			unk2b_value=data[39:62],
+			unk2a=data[15:38] if bool(data[14]) else None,
+			unk2b=data[39:62] if bool(data[38]) else None,
 		)
 
 class FoconDisplayDrawKind(Enum):
