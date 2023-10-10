@@ -30,7 +30,7 @@ def main() -> None:
                                 while True:
                                         found = False
                                         for f in self.frames:
-                                                if not checker or checker(f):
+                                                if not checker or checker(f.data):
                                                         found = True
                                                         break
 
@@ -42,9 +42,9 @@ def main() -> None:
                 rp.dest_id = args.source_id
                 bus = FoconMessageBus(FoconMockBus(frames=[rp]), src_id=0)
                 display = FoconDisplay(bus, args.id)
-                print(display.get_boot_info())
+                print(display.get_device_info())
 
-                print(FoconDisplayExtInfo.unpack(
+                print(FoconDisplayInfo.unpack(
                         bytes.fromhex('46 41 31 30 31 31 33 30') +
                         b'foo'.ljust(0x1d-0x12, b'\x00') +
                         str(42690).encode('ascii').ljust(0x28-0x1d, b'\x00') +
@@ -65,14 +65,14 @@ def main() -> None:
         display_subcommands = display_parser.add_subparsers(title='display subcommands', required=True)
 
         def do_display_info(display, args):
-                boot_info = display.get_boot_info()
+                device_info = display.get_device_info()
                 print('boot:')
-                print('  type:   ', boot_info.kind)
-                print('  version: {}.{:02}'.format(*boot_info.boot_version))
+                print('  type:   ', device_info.kind)
+                print('  version: {}.{:02}'.format(*device_info.boot_version))
                 print()
 
                 print('app:')
-                print('  version: {}.{:02}'.format(*boot_info.app_version))
+                print('  version: {}.{:02}'.format(*device_info.app_version))
                 print()
 
                 print('product:')
@@ -161,6 +161,11 @@ def main() -> None:
         print_parser = display_subcommands.add_parser('print')
         print_parser.set_defaults(_display_handler=do_display_print)
         print_parser.add_argument('message')
+
+        def do_display_flood(display, args):
+                print(display.flood())
+        flood_parser = display_subcommands.add_parser('flood')
+        flood_parser.set_defaults(_display_handler=do_display_flood)
 
         args = p.parse_args()
         root_logger = logging.getLogger()

@@ -1,13 +1,13 @@
-from typing import Callable, Iterator, Any
+from typing import Iterator
 from struct import pack, unpack
 from dataclasses import dataclass
 from enum import Enum, Flag
 
 from ..message import FoconMessageBus
+from .device import FoconDevice, FoconDeviceInfo, dangerous, decode_version, decode_str
 
 
 class FoconDisplayCommand(Enum):
-	BootInfo     = 0x0041
 	SelfDestruct = 0x0042
 	Status       = 0x0043
 	SelfTest     = 0x0044
@@ -27,40 +27,13 @@ class FoconDisplayCommand(Enum):
 	SetProductInfo    = 0x00F0
 	VerifyProductInfo = 0x00F1
 	#
-	ExtendedInfo = 0x3141
+	Info         = 0x3141
 	Dump         = 0xFFF0
 
 
-def decode_version(data: bytes) -> tuple[int, int]:
-	return int(data[0:1].decode('ascii'), 10), int(data[1:3].decode('ascii'), 10)
-
-def decode_str(data: bytes) -> str:
-	if b'\0' in data:
-		data = data[:data.index(b'\0')]
-	return data.decode('iso-8859-15')
 
 @dataclass
-class FoconDisplayBootInfo:
-	kind: str
-	boot_version: tuple[int, int]
-	app_version: tuple[int, int]
-
-	def pack(self) -> bytes:
-		raise NotImplementedError()
-
-	@classmethod
-	def unpack(cls, data: bytes) -> 'FoconDisplayBootInfo':
-		return cls(
-			kind=data[0:2].decode('ascii'),
-			boot_version=decode_version(data[2:5]),
-			app_version=decode_version(data[5:8]),
-		)
-
-	def __repr__(self) -> str:
-		return f'{self.__class__.__name__} {{ {self.kind}, boot: {self.boot_version[0]}.{self.boot_version[1]:02}, app: {self.app_version[0]}.{self.app_version[1]:02} }}'
-
-@dataclass
-class FoconDisplayExtInfo(FoconDisplayBootInfo):
+class FoconDisplayInfo(FoconDeviceInfo):
 	unk08: str
 	product_num: int
 	unk1E: str
@@ -70,11 +43,12 @@ class FoconDisplayExtInfo(FoconDisplayBootInfo):
 		raise NotImplementedError()
 
 	@classmethod
-	def unpack(cls, data: bytes) -> 'FoconDisplayExtInfo':
-		di = FoconDisplayBootInfo.unpack(data)
+	def unpack(cls, data: bytes) -> 'FoconDisplayInfo':
+		di = FoconDeviceInfo.unpack(data)
 
 		return cls(
 			kind=di.kind,
+			mode=di.mode,
 			boot_version=di.boot_version,
 			app_version=di.app_version,
 			unk08=decode_str(data[0x08:0x13]),
@@ -353,16 +327,11 @@ class FoconDisplayObject:
 		return pack('>HH', height, width) + data
 
 
-def dangerous(fn: Callable[..., Any]) -> Callable[..., Any]:
-	return fn
 
-class FoconDisplay:
-	def __init__(self, bus: FoconMessageBus, dest_id: int) -> None:
-		self.bus = bus
-		self.dest_id = dest_id
-
-	def send_command(self, command: FoconDisplayCommand, payload: bytes = b'') -> bytes:
+class FoconDisplay(FoconDevice):
+	def send_display_command(self, command: FoconDisplayCommand, payload: bytes = b'') -> bytes:
 		return self.bus.send_command(self.dest_id, command.value, payload=payload)
+
 
 	def parse_dump_response(self, type: FoconDisplayDumpType, response: bytes) -> str:
 		if response[0] != type.value:
@@ -370,17 +339,13 @@ class FoconDisplay:
 		return decode_str(response[2:])
 
 	def do_dump(self, type: FoconDisplayDumpType) -> str:
-		response = self.send_command(FoconDisplayCommand.Dump, bytes([type.value, 0x00]))
+		response = self.send_display_command(FoconDisplayCommand.Dump, bytes([type.value, 0x00]))
 		return self.parse_dump_response(type, response)
 
 	def recv_dump_messages(self, type: FoconDisplayDumpType) -> Iterator[str]:
 		for msg in self.bus.recv_messages(self.dest_id, cmd=FoconDisplayCommand.Dump.value):
 			yield self.parse_dump_response(type, msg.value)
 
-
-	def get_boot_info(self) -> FoconDisplayBootInfo:
-		response = self.send_command(FoconDisplayCommand.BootInfo)
-		return FoconDisplayBootInfo.unpack(response)
 
 	def print(self, message: str) -> bytes:
 		cmd = FoconDisplayObject(
@@ -393,52 +358,52 @@ class FoconDisplay:
 			unk0F=81,
 			data=FoconDisplayObject.make_string_data(message),
 		)
-		return self.send_command(FoconDisplayCommand.DrawString, cmd.pack())
+		return self.send_display_command(FoconDisplayCommand.DrawString, cmd.pack())
 
 	@dangerous
 	def self_destruct(self) -> None:
-		self.send_command(FoconDisplayCommand.SelfDestruct)
+		self.send_display_command(FoconDisplayCommand.SelfDestruct)
 
 	def get_status(self) -> FoconDisplayStatus:
-		response = self.send_command(FoconDisplayCommand.Status)
+		response = self.send_display_command(FoconDisplayCommand.Status)
 		return FoconDisplayStatus.unpack(response)
 
 	def trigger_selftest(self, type: FoconDisplaySelfTestKind) -> bool:
-		response = self.send_command(FoconDisplayCommand.SelfTest, bytes([type.value, 0x00]))
+		response = self.send_display_command(FoconDisplayCommand.SelfTest, bytes([type.value, 0x00]))
 		if response[0] != type.value:
 			raise ValueError(f'got invalid selftest type response {response[0]} != {type}')
 		return response[1] == 0xff
 
 	def get_config(self) -> FoconDisplayConfiguration:
-		response = self.send_command(FoconDisplayCommand.GetConfiguration)
+		response = self.send_display_command(FoconDisplayCommand.GetConfiguration)
 		return FoconDisplayConfiguration.unpack(response)
 
 	@dangerous
 	def set_config(self, config: FoconDisplayConfiguration) -> None:
-		response = self.send_command(FoconDisplayCommand.SetConfiguration, config.pack())
+		response = self.send_display_command(FoconDisplayCommand.SetConfiguration, config.pack())
 
 	@dangerous
 	def set_unk47(self, p1: int, p2: int) -> None:
-		self.send_command(FoconDisplayCommand.SetUnk47, bytes([p1, p2]))
+		self.send_display_command(FoconDisplayCommand.SetUnk47, bytes([p1, p2]))
 
 	def get_product_info(self) -> FoconDisplayProductInfo:
-		response = self.send_command(FoconDisplayCommand.ProductInfo)
+		response = self.send_display_command(FoconDisplayCommand.ProductInfo)
 		return FoconDisplayProductInfo.unpack(response)
-
-	def verify_product_info(self) -> None:
-		self.send_command(FoconDisplayCommand.VerifyProductInfo)
-
-	@dangerous
-	def set_product_info(self, info: FoconDisplayProductInfo) -> None:
-		self.send_command(FoconDisplayCommand.SetProductInfo, info.pack())
 
 	@dangerous
 	def reset_product_info(self) -> None:
-		self.send_command(FoconDisplayCommand.ResetProductInfo)
+		self.send_display_command(FoconDisplayCommand.ResetProductInfo)
 
-	def get_ext_info(self) -> FoconDisplayExtInfo:
-		response = self.send_command(FoconDisplayCommand.ExtendedInfo)
-		return FoconDisplayExtInfo.unpack(response)
+	def verify_product_info(self) -> None:
+		self.send_display_command(FoconDisplayCommand.VerifyProductInfo)
+
+	@dangerous
+	def set_product_info(self, info: FoconDisplayProductInfo) -> None:
+		self.send_display_command(FoconDisplayCommand.SetProductInfo, info.pack())
+
+	def get_display_info(self) -> FoconDisplayInfo:
+		response = self.send_display_command(FoconDisplayCommand.Info)
+		return FoconDisplayInfo.unpack(response)
 
 	def get_memory_stats(self) -> str:
 		return self.do_dump(FoconDisplayDumpType.MemoryStats)
