@@ -109,7 +109,7 @@ class FoconBus:
 			self.pending_data = b''
 			return None
 
-	def recv_(self, dest_id: int) -> None:
+	def recv_ack(self, dest_id: int) -> None:
 		self.recv_message(lambda data: data is None)
 
 	def recv_next_message(self, dest_id: int, checker: Callable[[bytes | None], bool] | None) -> bytes | None:

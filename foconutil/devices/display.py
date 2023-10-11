@@ -297,7 +297,7 @@ class Focon850(Codec):
 		return charmap_decode(input, errors, REVERSE_CHARSET)
 
 	@classmethod
-	def lookup(cls, name: str) -> CodecInfo:
+	def lookup(cls, name: str) -> CodecInfo | None:
 		if name == cls.NAME:
 			codec = cls()
 			return CodecInfo(name=name, encode=codec.encode, decode=codec.decode)
