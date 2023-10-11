@@ -264,8 +264,8 @@ class FoconDisplayStatus:
 		)
 
 class FoconDisplayDrawKind(Enum):
-	UnkN = 'N'
-	UnkA = 'A'
+	Replace = 'N'
+	Add = 'A'
 	UnkO = 'O'
 
 class FoconDisplayObjectEffect(Enum):
@@ -273,9 +273,9 @@ class FoconDisplayObjectEffect(Enum):
 	UnkD = 'D'
 	LeftScroll = 'L'
 	RightScroll = 'R'
-	Still = 'A'
+	Appear = 'A'
 	Disappear = 'B'
-	Flash = 'V'
+	Blink = 'V'
 
 @dataclass
 class FoconDisplayObject:
@@ -288,7 +288,7 @@ class FoconDisplayObject:
 	y_end:     int
 	x_start:   int = 0
 	y_start:   int = 0
-	effect:    FoconDisplayObjectEffect = FoconDisplayObjectEffect.Still
+	effect:    FoconDisplayObjectEffect = FoconDisplayObjectEffect.Appear
 	count:     int = 1
 	delay:     int = 1
 	data:      bytes = b''
@@ -351,7 +351,7 @@ class FoconDisplay(FoconDevice):
 		cmd = FoconDisplayObject(
 			object_id=0xFF,
 			output_id=1,
-			kind=FoconDisplayDrawKind.UnkN,
+			kind=FoconDisplayDrawKind.Replace,
 			x_end=207,
 			y_end=31,
 			unk0E=50,
