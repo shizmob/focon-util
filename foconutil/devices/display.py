@@ -1,4 +1,6 @@
 from typing import Iterator
+
+from codecs import Codec, CodecInfo, charmap_encode, charmap_decode, register as register_codec
 from struct import pack, unpack
 from dataclasses import dataclass
 from enum import Enum, Flag
@@ -277,6 +279,33 @@ class FoconDisplayObjectEffect(Enum):
 	Disappear = 'B'
 	Blink = 'V'
 
+
+REVERSE_CHARSET = {x: ord(bytes([x]).decode('cp850')) for x in range(256)}
+REVERSE_CHARSET[0xA7] = ord('✈')
+REVERSE_CHARSET[0xAE] = ord('←')
+REVERSE_CHARSET[0xAF] = ord('→')
+REVERSE_CHARSET[0xB0] = ord('º')
+CHARSET = {c: i for i, c in REVERSE_CHARSET.items()}
+
+class Focon850(Codec):
+	NAME = 'focon_train_cp850'
+
+	def encode(self, input: str, errors: str = 'strict') -> tuple[bytes, int]:
+		return charmap_encode(input, errors, CHARSET)
+
+	def decode(self, input: bytes, errors: str = 'strict') -> tuple[str, int]:
+		return charmap_decode(input, errors, REVERSE_CHARSET)
+
+	@classmethod
+	def lookup(cls, name: str) -> CodecInfo:
+		if name == cls.NAME:
+			codec = cls()
+			return CodecInfo(name=name, encode=codec.encode, decode=codec.decode)
+		return None
+
+register_codec(Focon850.lookup)
+
+
 @dataclass
 class FoconDisplayObject:
 	object_id: int
@@ -320,7 +349,7 @@ class FoconDisplayObject:
 
 	@classmethod
 	def make_string_data(cls, message: str, flags: int = 4, font_id: int = 16) -> bytes:
-		return bytes([flags, font_id]) + message.encode('cp850') + b'\x00'
+		return bytes([flags, font_id]) + message.encode(Focon850.NAME) + b'\x00'
 
 	@classmethod
 	def make_pixel_data(cls, data: bytes, width: int = 6, height: int = 12) -> bytes:
