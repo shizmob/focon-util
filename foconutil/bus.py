@@ -48,23 +48,26 @@ class FoconBus:
 		self.pending_data = b''
 		self.pending_frames: dict[int, list[FoconFrame]] = {}
 
-	def send_frame(self, dest_id: int | None, data: bytes) -> None:
+	def send_message(self, dest_id: int | None, data: bytes) -> None:
 		max_frame_size = 512
 		nframes = ceil(len(data) / max_frame_size)
 		for i in range(nframes):
 			frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=i + 1, total=nframes, data=data[i * max_frame_size:(i + 1) * max_frame_size])
-			LOG.debug('>> frame: %r', frame)
-			self.transport.write(frame.pack())
+			self.send_frame(frame)
 			if (i + 1) < nframes:
 				assert dest_id is not None
 				self.recv_ack(dest_id)
+
+	def send_frame(self, frame: FoconFrame) -> None:
+		LOG.debug('>> frame: %r', frame)
+		self.transport.write(frame.pack())
 
 	def send_ack(self, dest_id: int) -> None:
 		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
 		LOG.debug('>> ack: %r', dest_id)
 		self.transport.write(frame.pack())
 
-	def recv_frame(self, checker: Callable[[bytes | None], bool] | None = None) -> bytes | None:
+	def recv_message(self, checker: Callable[[bytes | None], bool] | None = None) -> bytes | None:
 		while True:
 			found = False
 			for src_id, frames in self.pending_frames.items():
@@ -84,34 +87,39 @@ class FoconBus:
 				del self.pending_frames[src_id]
 				return frame_data
 
-			self.pending_data += self.transport.read()
-			try:
-				frame, self.pending_data = FoconFrame.unpack(self.pending_data)
-				LOG.debug('<< frame: %r', frame)
-			except EOFError:
-				continue
-			except:
-				LOG.warn('Error parsing frame data %s, discarding', self.pending_data.hex())
-				self.pending_data = b''
-				continue
-
+			frame = None
+			while not frame:
+				frame = self.recv_frame()
 			if frame.dest_id not in (self.src_id, None):
 				continue
 			self.pending_frames.setdefault(frame.src_id, []).append(frame)
 			if frame.num < frame.total:
 				self.send_ack(frame.src_id)
 
-	def recv_ack(self, dest_id: int) -> None:
-		self.recv_frame(lambda data: data is None)
+	def recv_frame(self) -> FoconFrame | None:
+		self.pending_data += self.transport.read()
+		try:
+			frame, self.pending_data = FoconFrame.unpack(self.pending_data)
+			LOG.debug('<< frame: %r', frame)
+			return frame
+		except EOFError:
+			return None
+		except:
+			LOG.warn('Error parsing frame data %s, discarding', self.pending_data.hex())
+			self.pending_data = b''
+			return None
 
-	def recv_next_frame(self, dest_id: int, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
+	def recv_(self, dest_id: int) -> None:
+		self.recv_message(lambda data: data is None)
+
+	def recv_next_message(self, dest_id: int, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
 		self.send_ack(dest_id)
 
 		def inner_checker(data: bytes | None) -> bool:
 			if data is None:
 				return True
 			return not checker or checker(data)
-		data = self.recv_frame(inner_checker)
+		data = self.recv_message(inner_checker)
 		if not data:
 			return None
 		return data

@@ -23,10 +23,10 @@ def main() -> None:
                         def __init__(self, frames: list[FoconFrame]) -> None:
                                 self.frames = frames
 
-                        def send_frame(self, dest_id: int | None, data: bytes) -> None:
+                        def send_message(self, dest_id: int | None, data: bytes) -> None:
                                 pass
 
-                        def recv_frame(self, checker=None) -> bytes:
+                        def recv_message(self, checker=None) -> bytes:
                                 while True:
                                         found = False
                                         for f in self.frames:

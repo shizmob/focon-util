@@ -56,8 +56,8 @@ class FoconMessage:
 		return s
 
 class FoconMessageBus:
-	def __init__(self, frame_bus: FoconBus, src_id: int | None = None) -> None:
-		self.bus = frame_bus
+	def __init__(self, bus: FoconBus, src_id: int | None = None) -> None:
+		self.bus = bus
 		self.src_id = src_id
 
 	def check_message(self, dest_id: int | None, cmd: int | None, data: bytes | None) -> bool:
@@ -72,10 +72,10 @@ class FoconMessageBus:
 
 	def send_message(self, dest_id: int | None, message: FoconMessage) -> None:
 		LOG.debug('>> msg: %r', message)
-		return self.bus.send_frame(dest_id, message.pack())
+		return self.bus.send_message(dest_id, message.pack())
 
 	def recv_message(self, dest_id: int | None, cmd: int | None = None) -> FoconMessage:
-		data = self.bus.recv_frame(partial(self.check_message, dest_id, cmd))
+		data = self.bus.recv_message(partial(self.check_message, dest_id, cmd))
 		assert data is not None
 
 		msg, remainder_data = FoconMessage.unpack(data)
@@ -89,7 +89,7 @@ class FoconMessageBus:
 		checker = partial(self.check_message, dest_id, cmd)
 
 		while True:
-			data = self.bus.recv_next_frame(dest_id, checker)
+			data = self.bus.recv_next_message(dest_id, checker)
 			if not data:
 				break
 			msg, remainder_data = FoconMessage.unpack(data)
