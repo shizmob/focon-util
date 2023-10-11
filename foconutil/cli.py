@@ -54,6 +54,23 @@ def main() -> None:
         test_parser = subcommands.add_parser('test')
         test_parser.set_defaults(_handler=do_test)
 
+        def do_info(args):
+                bus = FoconMessageBus(FoconBus(FoconSerialTransport(args.device), args.source_id), args.source_id)
+                device = FoconDevice(bus, args.id)
+                device_info = device.get_device_info()
+                print('boot:')
+                print('  mode:   ', device_info.mode.name.lower())
+                print('  type:   ', device_info.kind)
+                print('  version: {}.{:02}'.format(*device_info.boot_version))
+                print()
+
+                if device_info.app_version:
+                        print('app:')
+                        print('  version: {}.{:02}'.format(*device_info.app_version))
+                        print()
+        info_parser = subcommands.add_parser('info')
+        info_parser.set_defaults(_handler=do_info)
+
         # Display subcommands
 
         def do_display(args):
