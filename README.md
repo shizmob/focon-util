@@ -72,6 +72,9 @@ stats:
 
 If this does not work, check your address pins and RS-485 connectivity. To make sure your display works at all, try bridging all adress pin pairs: upon startup, the display should then enter self-test mode.
 
+Currently supported drawing commands are:
+* Displaying text: `focon-util -d ... display print "Beste reizigers"`
+
 ## License
 
 [WTFPL](./COPYING).
