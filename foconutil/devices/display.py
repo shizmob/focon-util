@@ -349,6 +349,16 @@ class FoconDisplayDrawComposition(Enum):
 	Add = 'A'
 	UnkO = 'O'
 
+	@classmethod
+	def parse(cls, s: str) -> 'FoconDisplayDrawComposition':
+		return COMPOSITION_NAMES[s]
+
+COMPOSITION_NAMES = {
+	'none': FoconDisplayDrawComposition.Replace,
+	'replace': FoconDisplayDrawComposition.Replace,
+	'add': FoconDisplayDrawComposition.Add,
+}
+
 class FoconDisplayObjectEffect(Enum):
 	UnkU = 'U'
 	UnkD = 'D'
@@ -357,6 +367,20 @@ class FoconDisplayObjectEffect(Enum):
 	Appear = 'A'
 	Disappear = 'B'
 	Blink = 'V'
+
+	@classmethod
+	def parse(cls, s: str) -> 'FoconDisplayObjectEffect':
+		return EFFECT_NAMES[s]
+
+EFFECT_NAMES = {
+	'scroll': FoconDisplayObjectEffect.LeftScroll,
+	'left-scroll': FoconDisplayObjectEffect.LeftScroll,
+	'right-scroll': FoconDisplayObjectEffect.RightScroll,
+	'appear': FoconDisplayObjectEffect.Appear,
+	'none': FoconDisplayObjectEffect.Appear,
+	'disappear': FoconDisplayObjectEffect.Disappear,
+	'blink': FoconDisplayObjectEffect.Blink,
+}
 
 
 REVERSE_CHARSET = {x: ord(bytes([x]).decode('cp850')) for x in range(256)}
@@ -463,11 +487,12 @@ class FoconDisplay:
 		return self.device.get_device_info()
 
 
-	def print(self, message: str, composition: FoconDisplayDrawComposition = None) -> bytes:
+	def print(self, message: str, composition: FoconDisplayDrawComposition = None, effect: FoconDisplayObjectEffect = None) -> bytes:
 		cmd = FoconDisplayObject(
 			object_id=0xFF,
 			output_id=1,
 			composition=composition or FoconDisplayDrawComposition.Replace,
+			effect=effect or FoconDisplayObjectEffect.Appear,
 			x_end=207,
 			y_end=31,
 			unk0E=50,
