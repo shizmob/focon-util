@@ -30,9 +30,19 @@ class FoconDeviceInfo:
 	app_version: tuple[int, int] | None
 
 	def pack(self) -> bytes:
-		return (bytes([ord(self.kind), ord(self.mode.value)]) + 
-			encode_version(self.boot_version) +
-			encode_version(self.app_version) if self.app_version else b'???')
+		b = b''
+
+		# 0x00..0x02
+		b += bytes([
+			ord(self.kind),
+			ord(self.mode.value)]
+		)
+		# 0x02..0x05
+		b += encode_version(self.boot_version)
+		# 0x05..0x08
+		b += encode_version(self.app_version) if self.app_version else b'???'
+
+		return b
 
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDeviceInfo':
@@ -50,6 +60,12 @@ class FoconDeviceInfo:
 		s += ' }'
 		return s
 
+
+def encode_str(s: str, size: int) -> bytes:
+	sb = s.encode('iso-8859-15')
+	if len(sb) > size:
+		raise ValueError('over-sized string: {} can not fit in {} bytes'.format(s, size))
+	return sb.ljust(size, b'\0')
 
 def decode_str(data: bytes) -> str:
 	if b'\0' in data:
