@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum, Flag
 
 from ..message import FoconMessageBus
-from .device import FoconDevice, FoconDeviceInfo, dangerous, decode_version, decode_str
+from .device import FoconDevice, FoconDeviceInfo, dangerous, encode_version, decode_version, encode_str, decode_str
 
 
 class FoconDisplayCommand(Enum):
@@ -42,7 +42,18 @@ class FoconDisplayInfo(FoconDeviceInfo):
 	unk29: str
 
 	def pack(self) -> bytes:
-		raise NotImplementedError()
+		b = super().pack()
+
+		# 0x08..0x13
+		b += encode_str(self.unk08, 11)
+		# 0x13..0x1E
+		b += encode_str(str(self.product_num), 11)
+		# 0x1E..0x29
+		b += encode_str(self.unk1E, 11)
+		# 0x29..0x44
+		b += encode_str(self.unk29, 27)
+
+		raise b
 
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayInfo':
@@ -74,6 +85,25 @@ class FoconDisplayOutputConfiguration:
 	unk07: int
 	total_blocks: int
 
+	def pack(self) -> bytes:
+		b = b''
+
+		# 0x00..0x08
+		b += bytes([
+			self.unk00,
+			self.unk01,
+			self.unk02,
+			self.unk03,
+			self.unk04,
+			self.unk05,
+			self.row_blocks,
+			self.unk07,
+		])
+		# 0x08..0x0A
+		b += pack('>H', self.total_blocks)
+
+		return b
+
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayOutputConfiguration':
 		return cls(
@@ -96,9 +126,14 @@ class FoconDisplayOutputConfiguration:
 class FoconDisplayConfigurationUnk6C:
 	data: bytes
 
+	def pack(self) -> bytes:
+		return self.data
+
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayConfigurationUnk6C':
 		return cls(data=data)
+
+MAX_OUTPUTS = 10
 
 @dataclass
 class FoconDisplayConfiguration:
@@ -111,12 +146,13 @@ class FoconDisplayConfiguration:
 	hw_loop_delay_ms: int
 	brightness_mess_count:  int
 	temperature_mess_count: int
-	
+
 	outputs: list[FoconDisplayOutputConfiguration]
 
 	unk6C: FoconDisplayConfigurationUnk6C
 	unk94: FoconDisplayConfigurationUnk6C
 
+	unk00: int
 	unkBC: int
 	unkBE: int
 	unkBF: int
@@ -126,7 +162,49 @@ class FoconDisplayConfiguration:
 	y_max: int
 
 	def pack(self) -> bytes:
-		raise NotImplementedError()
+		b = b''
+
+		# 0x00..0x07
+		b += bytes([
+			self.unk00,
+			1 if self.brightness_sensor else 0,   # param3
+			1 if self.active_low else 0,          # param4
+			self.param0,
+			self.led_col_size,                    # param2
+			self.param1,
+			self.led_delay_us,                    # param6
+			len(self.outputs),
+		])
+		# 0x08..0x06C
+		for out in self.outputs:
+			b += out.pack()
+		for _ in range(MAX_OUTPUTS - len(self.outputs)):
+			b += FoconDisplayOutputConfiguration.unused().pack()
+		# 0x6C..0x94
+		b += self.unk6C.pack()
+		# 0x94..0xBC
+		b += self.unk94.pack()
+		# 0xBC..0xBE
+		b += pack('>H', self.unkBC)
+		# 0xBE..0xC2
+		b += bytes([
+			self.unkBE,
+			self.unkBF,
+			self.x_offset,
+			self.y_offset,
+		])
+		# 0xC2..0xC4
+		b += pack('>H', self.x_max)
+		# 0xC4..0xC6
+		b += pack('>H', self.y_max)
+		# 0xC6..0xC9
+		b += bytes([
+			self.hw_loop_delay_ms,       # param7
+			self.brightness_mess_count,  # param8
+			self.temperature_mess_count, # param9
+		])
+
+		return b
 
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayConfiguration':
@@ -149,6 +227,7 @@ class FoconDisplayConfiguration:
 			unk6C=FoconDisplayConfigurationUnk6C.unpack(data[0x6C:0x94]),
 			unk94=FoconDisplayConfigurationUnk6C.unpack(data[0x94:0xBC]),
 
+			unk00=data[0],
 			unkBC=unpack('>H', data[0xBC:0xBE])[0],
 			unkBE=data[0xBE],
 			unkBF=data[0xBF],
