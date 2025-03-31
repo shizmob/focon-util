@@ -462,9 +462,20 @@ class FoconDisplayObject:
 
 class FoconDisplay:
 	device: FoconDevice
+	current_config: FoconDisplayConfiguration = None
 
 	def __init__(self, device: FoconDevice) -> None:
 		self.device = device
+		self.current_config = None
+
+	def get_current_config(self) -> FoconDisplayConfiguration:
+		if not self.current_config:
+			self.current_config = self.get_config()
+		return self.current_config
+
+	def use_config(self, config: FoconDisplayConfiguration) -> None:
+		self.current_config = config
+
 
 	def send_command(self, command: FoconDisplayCommand, payload: bytes = b'') -> bytes:
 		return self.device.send_command(command.value, payload=payload)
@@ -488,14 +499,15 @@ class FoconDisplay:
 
 
 	def print(self, message: str, composition: FoconDisplayDrawComposition = None, effect: FoconDisplayObjectEffect = None) -> bytes:
+		config = self.get_current_config()
 		cmd = FoconDisplayObject(
 			object_id=0xFF,
 			output_id=1,
 			composition=composition or FoconDisplayDrawComposition.Replace,
 			effect=effect or FoconDisplayObjectEffect.Appear,
-			x_end=207,
-			y_end=31,
-			unk0E=50,
+			x_end=config.x_max,
+			y_end=config.y_max,
+			unk0E=255,
 			unk0F=81,
 			data=FoconDisplayObject.make_string_data(message),
 		)
