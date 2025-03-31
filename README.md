@@ -82,7 +82,7 @@ Connect a RS-485 transceiver to pins X1, X2, and X3, and a 120 ohm terminating r
 
 #### NS ICMm
 
-Supported displays will have a single [Harting Han 24DD](https://www.harting.com/en-PE/p/Han-24DD-HMC-M-c-09162243001) connector on the top with the following pin-out:
+Supported displays will have a single [Harting Han 24DD](https://www.harting.com/en-PE/p/Han-24DD-HMC-M-c-09162243001) connector on top, with the following pin-out:
 
 ```
    _/-----------\_
@@ -107,9 +107,9 @@ Supported displays will have a single [Harting Han 24DD](https://www.harting.com
 11: address bit (1?) [no pin]
 12: address bit (0?) [no pin]
 13: RS-485 GND
-14: RS-485 GND  [no pin?]
-15: RS-485 GND  [no pin?]
-16: RS-485 GND  [no pin?]
+14: RS-485 GND (for address bit 2?) [no pin?]
+15: RS-485 GND (for address bit 1?) [no pin?]
+16: RS-485 GND (for address bit 0?) [no pin?]
 17: RS-485 in-
 18: RS-485 in-  [no pin]
 19: RS-485 out-
@@ -120,7 +120,7 @@ Supported displays will have a single [Harting Han 24DD](https://www.harting.com
 24: (debug TX?) [no pin]
 ```
 
-Connect a 90-140V DC power supply to pin 1, and bridge the address pin pairs as desired (or leave them all unbridged for ID 0).
+Connect a 90-140V DC power supply to pins 1 and 2, and bridge the address pin pairs as desired (or leave them all unbridged for ID 0).
 Connect a RS-485 transceiver to pins 13, 17, and 21. Testing so far worked without any 120 ohm terminating resistor.
 
 ## License
