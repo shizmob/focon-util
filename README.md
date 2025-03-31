@@ -2,8 +2,8 @@
 
 Utility and library to talk to industrial devices from Focon Electronics Systems A/S, as used in:
 * Various trains operated by the Dutch railway company Nederlandse Spoorwegen (NS):
-  * Stadsgewestelijk Materieel-gemoderniseerd (SGMm, also known as Plan Y)
-  * Intercitymateriaal gemoderniseerd (ICMm, also known as Plan Z)
+  * Stadsgewestelijk Materieel (gemoderniseerd) [SGMm, also known as Plan Y]
+  * Intercitymaterieel (gemoderniseerd) [ICMm, also known as Plan Z]
 * Various trains operated by the Danish railway company Danske Statsbaner (DSB)
 
 ## Installation
