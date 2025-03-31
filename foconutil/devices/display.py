@@ -344,7 +344,7 @@ class FoconDisplayStatus:
 			unk2b=data[39:62] if bool(data[38]) else None,
 		)
 
-class FoconDisplayDrawKind(Enum):
+class FoconDisplayDrawComposition(Enum):
 	Replace = 'N'
 	Add = 'A'
 	UnkO = 'O'
@@ -387,22 +387,22 @@ register_codec(Focon850.lookup)
 
 @dataclass
 class FoconDisplayObject:
-	object_id: int
-	output_id: int
-	unk0E:     int
-	unk0F:     int
-	kind:      FoconDisplayDrawKind
-	x_end:     int
-	y_end:     int
-	x_start:   int = 0
-	y_start:   int = 0
-	effect:    FoconDisplayObjectEffect = FoconDisplayObjectEffect.Appear
-	count:     int = 1
-	delay:     int = 1
-	data:      bytes = b''
+	object_id:   int
+	output_id:   int
+	unk0E:       int
+	unk0F:       int
+	composition: FoconDisplayDrawComposition
+	x_end:       int
+	y_end:       int
+	x_start:     int = 0
+	y_start:     int = 0
+	effect:      FoconDisplayObjectEffect = FoconDisplayObjectEffect.Appear
+	count:       int = 1
+	delay:       int = 1
+	data:        bytes = b''
 
 	def pack(self) -> bytes:
-		return (bytes([self.object_id, ord(self.kind.value)]) +
+		return (bytes([self.object_id, ord(self.composition.value)]) +
 		        pack('>HHHH', self.x_start, self.y_start, self.x_end, self.y_end) +
 		        bytes([ord(self.effect.value), self.count, self.output_id, self.delay, self.unk0E, self.unk0F]) +
 		        self.data)
@@ -412,7 +412,7 @@ class FoconDisplayObject:
 		x_start, y_start, x_end, y_end = unpack('>HHHH', data[2:10])
 		return cls(
 			object_id=data[0],
-			kind=FoconDisplayDrawKind(chr(data[1])),
+			composition=FoconDisplayDrawComposition(chr(data[1])),
 			x_start=x_start,
 			y_start=y_start,
 			x_end=x_end,
@@ -463,11 +463,11 @@ class FoconDisplay:
 		return self.device.get_device_info()
 
 
-	def print(self, message: str) -> bytes:
+	def print(self, message: str, composition: FoconDisplayDrawComposition = None) -> bytes:
 		cmd = FoconDisplayObject(
 			object_id=0xFF,
 			output_id=1,
-			kind=FoconDisplayDrawKind.Replace,
+			composition=composition or FoconDisplayDrawComposition.Replace,
 			x_end=207,
 			y_end=31,
 			unk0E=50,
