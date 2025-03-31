@@ -8,6 +8,7 @@ from .devices.display import *
 def main() -> None:
         p = argparse.ArgumentParser()
         p.add_argument('-d', '--device', default='/dev/ttyUSB0', help='bus device')
+        p.add_argument('--no-flow-control', action='store_false', dest='flow_control', default=True, help='disable hardware flow control')
         p.add_argument('-D', '--debug', action='store_true', help='debug log')
         p.add_argument('-s', '--source-id', type=int, default=14, help='source device ID')
         p.add_argument('-i', '--id', type=int, default=0, help='device ID')
@@ -49,14 +50,14 @@ def main() -> None:
                         bytes.fromhex('46 41 31 30 31 31 33 30') +
                         b'foo'.ljust(0x1d-0x12, b'\x00') +
                         str(42690).encode('ascii').ljust(0x28-0x1d, b'\x00') +
-                        b'abcde'.ljust(0x33-0x28, b'\x00') + 
+                        b'abcde'.ljust(0x33-0x28, b'\x00') +
                         b'lel'.ljust(0x44-0x33, b'\x00')
                 ))
         test_parser = subcommands.add_parser('test')
         test_parser.set_defaults(_handler=do_test)
 
         def do_info(args):
-                bus = FoconMessageBus(FoconBus(FoconSerialTransport(args.device), args.source_id), args.source_id)
+                bus = FoconMessageBus(FoconBus(FoconSerialTransport(args.device, flow_control=args.flow_control), args.source_id), args.source_id)
                 device = FoconDevice(bus, args.id)
                 device_info = device.get_device_info()
                 print('boot:')

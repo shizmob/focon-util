@@ -20,8 +20,8 @@ class FoconTransport(Protocol):
 class FoconSerialTransport(FoconTransport):
 	BAUDRATE = 57600
 
-	def __init__(self, device: str, sleep_after_tx: float | None = 0.0002) -> None:
-		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=True)
+	def __init__(self, device: str, sleep_after_tx: float | None = 0.0002, flow_control: bool = True) -> None:
+		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=flow_control)
 		self.sleep_after_tx = sleep_after_tx
 		self.serial.reset_output_buffer()
 		self.serial.reset_input_buffer()
