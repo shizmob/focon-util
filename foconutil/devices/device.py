@@ -65,8 +65,18 @@ class FoconDevice:
 		self.bus = bus
 		self.dest_id = dest_id
 
+	def send_command(self, command: int, payload: bytes = b'') -> bytes:
+		return self.bus.send_command(self.dest_id, command, payload=payload)
+
+	def recv_message(self, cmd: int | None = None) -> bytes:
+		return self.bus.recv_message(self.dest_id, cmd=cmd)
+
+	def recv_messages(self, cmd: int | None = None) -> bytes:
+		return self.bus.recv_messages(self.dest_id, cmd=cmd)
+
+
 	def send_device_command(self, command: FoconDeviceCommand, payload: bytes = b'') -> bytes:
-		return self.bus.send_command(self.dest_id, command.value, payload=payload)
+		return self.send_command(command.value, payload=payload)
 
 	def get_device_info(self) -> FoconDeviceInfo:
 		response = self.send_device_command(FoconDeviceCommand.BootInfo)

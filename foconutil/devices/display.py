@@ -357,9 +357,14 @@ class FoconDisplayObject:
 
 
 
-class FoconDisplay(FoconDevice):
-	def send_display_command(self, command: FoconDisplayCommand, payload: bytes = b'') -> bytes:
-		return self.bus.send_command(self.dest_id, command.value, payload=payload)
+class FoconDisplay:
+	device: FoconDevice
+
+	def __init__(self, device: FoconDevice) -> None:
+		self.device = device
+
+	def send_command(self, command: FoconDisplayCommand, payload: bytes = b'') -> bytes:
+		return self.device.send_command(command.value, payload=payload)
 
 
 	def parse_dump_response(self, type: FoconDisplayDumpType, response: bytes) -> str:
@@ -368,12 +373,15 @@ class FoconDisplay(FoconDevice):
 		return decode_str(response[2:])
 
 	def do_dump(self, type: FoconDisplayDumpType) -> str:
-		response = self.send_display_command(FoconDisplayCommand.Dump, bytes([type.value, 0x00]))
+		response = self.send_command(FoconDisplayCommand.Dump, bytes([type.value, 0x00]))
 		return self.parse_dump_response(type, response)
 
 	def recv_dump_messages(self, type: FoconDisplayDumpType) -> Iterator[str]:
-		for msg in self.bus.recv_messages(self.dest_id, cmd=FoconDisplayCommand.Dump.value):
+		for msg in self.device.recv_messages(cmd=FoconDisplayCommand.Dump.value):
 			yield self.parse_dump_response(type, msg.value)
+
+	def get_device_info(self) -> FoconDeviceInfo:
+		return self.device.get_device_info()
 
 
 	def print(self, message: str) -> bytes:
@@ -387,51 +395,51 @@ class FoconDisplay(FoconDevice):
 			unk0F=81,
 			data=FoconDisplayObject.make_string_data(message),
 		)
-		return self.send_display_command(FoconDisplayCommand.DrawString, cmd.pack())
+		return self.send_command(FoconDisplayCommand.DrawString, cmd.pack())
 
 	@dangerous
 	def self_destruct(self) -> None:
-		self.send_display_command(FoconDisplayCommand.SelfDestruct)
+		self.send_command(FoconDisplayCommand.SelfDestruct)
 
 	def get_status(self) -> FoconDisplayStatus:
-		response = self.send_display_command(FoconDisplayCommand.Status)
+		response = self.send_command(FoconDisplayCommand.Status)
 		return FoconDisplayStatus.unpack(response)
 
 	def trigger_selftest(self, type: FoconDisplaySelfTestKind) -> bool:
-		response = self.send_display_command(FoconDisplayCommand.SelfTest, bytes([type.value, 0x00]))
+		response = self.send_command(FoconDisplayCommand.SelfTest, bytes([type.value, 0x00]))
 		if response[0] != type.value:
 			raise ValueError(f'got invalid selftest type response {response[0]} != {type}')
 		return response[1] == 0xff
 
 	def get_config(self) -> FoconDisplayConfiguration:
-		response = self.send_display_command(FoconDisplayCommand.GetConfiguration)
+		response = self.send_command(FoconDisplayCommand.GetConfiguration)
 		return FoconDisplayConfiguration.unpack(response)
 
 	@dangerous
 	def set_config(self, config: FoconDisplayConfiguration) -> None:
-		response = self.send_display_command(FoconDisplayCommand.SetConfiguration, config.pack())
+		response = self.send_command(FoconDisplayCommand.SetConfiguration, config.pack())
 
 	@dangerous
 	def set_unk47(self, p1: int, p2: int) -> None:
-		self.send_display_command(FoconDisplayCommand.SetUnk47, bytes([p1, p2]))
+		self.send_command(FoconDisplayCommand.SetUnk47, bytes([p1, p2]))
 
 	def get_product_info(self) -> FoconDisplayProductInfo:
-		response = self.send_display_command(FoconDisplayCommand.ProductInfo)
+		response = self.send_command(FoconDisplayCommand.ProductInfo)
 		return FoconDisplayProductInfo.unpack(response)
 
 	@dangerous
 	def reset_product_info(self) -> None:
-		self.send_display_command(FoconDisplayCommand.ResetProductInfo)
+		self.send_command(FoconDisplayCommand.ResetProductInfo)
 
 	def verify_product_info(self) -> None:
-		self.send_display_command(FoconDisplayCommand.VerifyProductInfo)
+		self.send_command(FoconDisplayCommand.VerifyProductInfo)
 
 	@dangerous
 	def set_product_info(self, info: FoconDisplayProductInfo) -> None:
-		self.send_display_command(FoconDisplayCommand.SetProductInfo, info.pack())
+		self.send_command(FoconDisplayCommand.SetProductInfo, info.pack())
 
 	def get_display_info(self) -> FoconDisplayInfo:
-		response = self.send_display_command(FoconDisplayCommand.Info)
+		response = self.send_command(FoconDisplayCommand.Info)
 		return FoconDisplayInfo.unpack(response)
 
 	def get_memory_stats(self) -> str:

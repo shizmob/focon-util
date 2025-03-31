@@ -41,7 +41,8 @@ def main() -> None:
                 rp, _ = FoconFrame.unpack(bytes.fromhex('ff ff ff 01 49 2a 01 01 00 12 49 30 00 00 49 30 00 08 00 41 46 41 31 30 31 31 33 30 8c 03 ff ff'))
                 rp.dest_id = args.source_id
                 bus = FoconMessageBus(FoconMockBus(frames=[rp]), src_id=0)
-                display = FoconDisplay(bus, args.id)
+                device = FoconDevice(bus, args.id)
+                display = FoconDisplay(device)
                 print(display.get_device_info())
 
                 print(FoconDisplayInfo.unpack(
@@ -75,7 +76,9 @@ def main() -> None:
 
         def do_display(args):
                 bus = FoconMessageBus(FoconBus(FoconSerialTransport(args.device), args.source_id), args.source_id)
-                display = FoconDisplay(bus, args.id)
+                device = FoconDevice(bus, args.id)
+                display = FoconDisplay(device)
+
                 args._display_handler(display, args)
         display_parser = subcommands.add_parser('display')
         display_parser.set_defaults(_handler=do_display, _display_handler=None)
