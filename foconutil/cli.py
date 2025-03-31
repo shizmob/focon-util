@@ -125,7 +125,7 @@ def main() -> None:
         get_ext_info_parser.set_defaults(_display_handler=do_display_get_ext_info)
 
         def do_display_get_config(display, args):
-                print(display.get_config())
+                print(display.get_current_config())
         get_config_parser = display_subcommands.add_parser('get-config')
         get_config_parser.set_defaults(_display_handler=do_display_get_config)
 
@@ -176,16 +176,45 @@ def main() -> None:
         test_disp_304_parser = display_subcommands.add_parser('test-disp-304')
         test_disp_304_parser.set_defaults(_display_handler=do_display_test_disp_304)
 
+        # Display drawing commands
+
+        def do_display_draw(display, args):
+                # Obtain (and store) config if needed
+                config = None
+                config_bytes = args.config.read() if args.config else None
+                if config_bytes:
+                        try:
+                                config = FoconDisplayConfiguration.unpack(config_bytes)
+                        except:
+                                print('display configuration was corrupted, re-reading')
+                                config_bytes = None
+                if not config:
+                        config = display.get_current_config()
+                        if args.config:
+                                args.config.truncate(0)
+                                args.config.write(config.pack())
+                display.use_config(config)
+                return args._display_draw_handler(display, args)
+
+        def add_display_draw_args(parser):
+                parser.add_argument('-c', '--config', type=argparse.FileType('a+b'), help='path to file containing display configuration to use (will be written if specified but empty or invalid)')
+                parser.add_argument('-C', '--composition', type=FoconDisplayDrawComposition.parse, choices=list(COMPOSITION_NAMES))
+                parser.add_argument('-f', '--effect', type=FoconDisplayObjectEffect.parse, choices=list(EFFECT_NAMES))
+                parser.set_defaults(_display_handler=do_display_draw, _display_draw_handler=None)
+
         def do_display_print(display, args):
-                print(display.print(args.message))
+                print(display.print(args.message, effect=args.effect))
+
         print_parser = display_subcommands.add_parser('print')
-        print_parser.set_defaults(_display_handler=do_display_print)
+        add_display_draw_args(print_parser)
+        print_parser.set_defaults(_display_draw_handler=do_display_print)
         print_parser.add_argument('message')
 
         def do_display_flood(display, args):
                 print(display.flood())
         flood_parser = display_subcommands.add_parser('flood')
-        flood_parser.set_defaults(_display_handler=do_display_flood)
+        add_display_draw_args(flood_parser)
+        flood_parser.set_defaults(_display_draw_handler=do_display_flood)
 
         args = p.parse_args()
         root_logger = logging.getLogger()
