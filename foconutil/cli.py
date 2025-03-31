@@ -19,43 +19,6 @@ def main() -> None:
 
         # General subcommands
 
-        def do_test(args):
-                class FoconMockBus(FoconBus):
-                        def __init__(self, frames: list[FoconFrame]) -> None:
-                                self.frames = frames
-
-                        def send_message(self, dest_id: int | None, data: bytes) -> None:
-                                pass
-
-                        def recv_message(self, checker=None) -> bytes:
-                                while True:
-                                        found = False
-                                        for f in self.frames:
-                                                if not checker or checker(f.data):
-                                                        found = True
-                                                        break
-
-                                        if found:
-                                                self.frames.remove(f)
-                                                return f.data
-
-                rp, _ = FoconFrame.unpack(bytes.fromhex('ff ff ff 01 49 2a 01 01 00 12 49 30 00 00 49 30 00 08 00 41 46 41 31 30 31 31 33 30 8c 03 ff ff'))
-                rp.dest_id = args.source_id
-                bus = FoconMessageBus(FoconMockBus(frames=[rp]), src_id=0)
-                device = FoconDevice(bus, args.id)
-                display = FoconDisplay(device)
-                print(display.get_device_info())
-
-                print(FoconDisplayInfo.unpack(
-                        bytes.fromhex('46 41 31 30 31 31 33 30') +
-                        b'foo'.ljust(0x1d-0x12, b'\x00') +
-                        str(42690).encode('ascii').ljust(0x28-0x1d, b'\x00') +
-                        b'abcde'.ljust(0x33-0x28, b'\x00') +
-                        b'lel'.ljust(0x44-0x33, b'\x00')
-                ))
-        test_parser = subcommands.add_parser('test')
-        test_parser.set_defaults(_handler=do_test)
-
         def do_info(args):
                 bus = FoconMessageBus(FoconBus(FoconSerialTransport(args.device, flow_control=args.flow_control), args.source_id), args.source_id)
                 device = FoconDevice(bus, args.id)
@@ -216,6 +179,48 @@ def main() -> None:
         flood_parser = display_subcommands.add_parser('flood')
         add_display_draw_args(flood_parser)
         flood_parser.set_defaults(_display_draw_handler=do_display_flood)
+
+        # Debug commands
+
+        debug_parser = subcommands.add_parser('debug')
+        debug_subcommands = debug_parser.add_subparsers(title='debug subcommands', required=True)
+
+        def do_self_test(args):
+                class FoconMockBus(FoconBus):
+                        def __init__(self, frames: list[FoconFrame]) -> None:
+                                self.frames = frames
+
+                        def send_message(self, dest_id: int | None, data: bytes) -> None:
+                                pass
+
+                        def recv_message(self, checker=None) -> bytes:
+                                while True:
+                                        found = False
+                                        for f in self.frames:
+                                                if not checker or checker(f.data):
+                                                        found = True
+                                                        break
+
+                                        if found:
+                                                self.frames.remove(f)
+                                                return f.data
+
+                rp, _ = FoconFrame.unpack(bytes.fromhex('ff ff ff 01 49 2a 01 01 00 12 49 30 00 00 49 30 00 08 00 41 46 41 31 30 31 31 33 30 8c 03 ff ff'))
+                rp.dest_id = args.source_id
+                bus = FoconMessageBus(FoconMockBus(frames=[rp]), src_id=0)
+                device = FoconDevice(bus, args.id)
+                display = FoconDisplay(device)
+                print(display.get_device_info())
+
+                print(FoconDisplayInfo.unpack(
+                        bytes.fromhex('46 41 31 30 31 31 33 30') +
+                        b'foo'.ljust(0x1d-0x12, b'\x00') +
+                        str(42690).encode('ascii').ljust(0x28-0x1d, b'\x00') +
+                        b'abcde'.ljust(0x33-0x28, b'\x00') +
+                        b'lel'.ljust(0x44-0x33, b'\x00')
+                ))
+        self_test_parser = debug_subcommands.add_parser('self-test')
+        self_test_parser.set_defaults(_handler=do_self_test)
 
         args = p.parse_args()
         root_logger = logging.getLogger()
