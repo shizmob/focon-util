@@ -77,9 +77,9 @@ class FoconDisplayInfo(FoconDeviceInfo):
 class FoconDisplayOutputConfiguration:
 	unk00: int
 	unk01: int
-	unk02: int
-	unk03: int
-	unk04: int
+	row_num: int
+	col_num: int
+	axes_flipped: bool
 	unk05: int
 	row_blocks: int
 	unk07: int
@@ -92,9 +92,9 @@ class FoconDisplayOutputConfiguration:
 		b += bytes([
 			self.unk00,
 			self.unk01,
-			self.unk02,
-			self.unk03,
-			self.unk04,
+			self.row_num,
+			self.col_num,
+			1 if self.axes_flipped else 0,
 			self.unk05,
 			self.row_blocks,
 			self.unk07,
@@ -105,13 +105,21 @@ class FoconDisplayOutputConfiguration:
 		return b
 
 	@classmethod
+	def unused(cls) -> 'FoconDisplayOutputConfiguration':
+		return cls(
+			unk00=0, unk01=0,
+			row_num=0, col_num=0, axes_flipped=False,
+			unk05=0, row_blocks=0, unk07=0, total_blocks=0,
+		)
+
+	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayOutputConfiguration':
 		return cls(
 			unk00=data[0],
 			unk01=data[1],
-			unk02=data[2],
-			unk03=data[3],
-			unk04=data[4],
+			row_num=data[2],
+			col_num=data[3],
+			axes_flipped=bool(data[4]),
 			unk05=data[5],
 			row_blocks=data[6],
 			unk07=data[7],
