@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Iterator, Optional, List, Tuple
 
 from codecs import Codec, CodecInfo, charmap_encode, charmap_decode, register as register_codec
 from struct import pack, unpack
@@ -17,12 +17,12 @@ class FoconDisplayCommand(Enum):
 	GetConfiguration = 0x0046
 	#
 	SetUnk47     = 0x0047
-	DrawClear    = 0x0048
+	Clear        = 0x0048
 	DrawPixels   = 0x0049
 	DrawString   = 0x004A
 	# 0x4B is not defined
-	DispUnk4C    = 0x004C
-	DispUnk4D    = 0x004D
+	Undraw       = 0x004C
+	Redraw       = 0x004D
 	# 0x4E is not defined
 	ProductInfo       = 0x004F
 	ResetProductInfo  = 0x0050
@@ -161,13 +161,13 @@ class FoconDisplayConfiguration:
 	unk94: FoconDisplayConfigurationUnk6C
 
 	unk00: int
-	unkBC: int
+	watchdog_time: int
 	unkBE: int
 	unkBF: int
-	x_offset: int
-	y_offset: int
-	x_max: int
-	y_max: int
+	x_start: int
+	y_start: int
+	x_end: int
+	y_end: int
 
 	def pack(self) -> bytes:
 		b = b''
@@ -193,18 +193,18 @@ class FoconDisplayConfiguration:
 		# 0x94..0xBC
 		b += self.unk94.pack()
 		# 0xBC..0xBE
-		b += pack('>H', self.unkBC)
+		b += pack('>H', self.watchdog_time)
 		# 0xBE..0xC2
 		b += bytes([
 			self.unkBE,
 			self.unkBF,
-			self.x_offset,
-			self.y_offset,
+			self.x_start,
+			self.y_start,
 		])
 		# 0xC2..0xC4
-		b += pack('>H', self.x_max)
+		b += pack('>H', self.x_end)
 		# 0xC4..0xC6
-		b += pack('>H', self.y_max)
+		b += pack('>H', self.y_end)
 		# 0xC6..0xC9
 		b += bytes([
 			self.hw_loop_delay_ms,       # param7
@@ -236,13 +236,13 @@ class FoconDisplayConfiguration:
 			unk94=FoconDisplayConfigurationUnk6C.unpack(data[0x94:0xBC]),
 
 			unk00=data[0],
-			unkBC=unpack('>H', data[0xBC:0xBE])[0],
+			watchdog_time=unpack('>H', data[0xBC:0xBE])[0],
 			unkBE=data[0xBE],
 			unkBF=data[0xBF],
-			x_offset=data[0xC0],
-			y_offset=data[0xC1],
-			x_max=unpack('>H', data[0xC2:0xC4])[0],
-			y_max=unpack('>H', data[0xC4:0xC6])[0],
+			x_start=data[0xC0],
+			y_start=data[0xC1],
+			x_end=unpack('>H', data[0xC2:0xC4])[0],
+			y_end=unpack('>H', data[0xC4:0xC6])[0],
 		)
 
 	@property
@@ -253,19 +253,25 @@ class FoconDisplayConfiguration:
 	def leds_per_row_block(self) -> int:
 		return 16
 
+	def width_of(self, output: FoconDisplayOutputConfiguration) -> int:
+		return output.col_blocks * self.leds_per_col_block
+
 	@property
 	def width(self) -> int:
-		if (self.x_offset, self.y_offset, self.x_max, self.y_max) != (0, 0, 0, 0):
-			return self.x_max - self.x_offset + 1
-		entry = self.outputs[0]
-		return entry.col_blocks * self.leds_per_col_block
+		if (self.x_start, self.y_start, self.x_end, self.y_end) != (0, 0, 0, 0):
+			return self.x_end - self.x_start + 1
+		else:
+			return sum(self.width_of(output) for output in self.outputs)
+
+	def height_of(self, output: FoconDisplayOutputConfiguration) -> int:
+		return output.row_blocks * self.leds_per_row_block
 
 	@property
 	def height(self) -> int:
-		if (self.x_offset, self.y_offset, self.x_max, self.y_max) != (0, 0, 0, 0):
-			return self.y_max - self.y_offset + 1
-		entry = self.outputs[0]
-		return entry.row_blocks * self.leds_per_row_block
+		if (self.x_start, self.y_start, self.x_end, self.y_end) != (0, 0, 0, 0):
+			return self.y_end - self.y_start + 1
+		else:
+			return sum(self.height_of(output) for output in self.outputs)
 
 class FoconDisplayDumpType(Enum):
 	MemoryStats = 0x01
@@ -356,6 +362,7 @@ class FoconDisplayDrawComposition(Enum):
 	Replace = 'N'
 	Add = 'A'
 	UnkO = 'O'
+	Remove = '0'
 
 	@classmethod
 	def parse(cls, s: str) -> 'FoconDisplayDrawComposition':
@@ -365,6 +372,7 @@ COMPOSITION_NAMES = {
 	'none': FoconDisplayDrawComposition.Replace,
 	'replace': FoconDisplayDrawComposition.Replace,
 	'add': FoconDisplayDrawComposition.Add,
+	'remove': FoconDisplayDrawComposition.Remove,
 }
 
 class FoconDisplayObjectEffect(Enum):
@@ -417,6 +425,85 @@ class Focon850(Codec):
 register_codec(Focon850.lookup)
 
 
+class FoconDisplayOutputSelector(Enum):
+	AllFrom = 0
+	Single = 1
+	SingleArea = 2
+
+@dataclass
+class FoconDisplayClearSpecification:
+	mode: FoconDisplayOutputSelector
+	output_id: int
+	x_start: int = 0
+	x_end: int = 0
+	y_start: int = 0
+	y_end: int = 0
+
+	def pack(self) -> bytes:
+		b = b''
+
+		b += bytes([
+			self.mode.value,
+			self.output_id,
+		])
+		b += pack('>HH', self.x_start, self.x_end)
+		b += pack('>HH', self.y_start, self.y_end)
+
+		return b
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'FoconDisplayClearSpecification':
+		return cls(
+			mode=FoconDisplayOutputSelector(data[0]),
+			output_id=data[1],
+			x_start=unpack('>H', data[2:4]),
+			x_end=unpack('>H', data[4:6]),
+			y_start=unpack('>H', data[6:8]),
+			y_end=unpack('>H', data[8:10]),
+		)
+
+@dataclass
+class FoconDisplayObjectList:
+	ids: List[int]
+
+	def pack(self) -> bytes:
+		return bytes([len(self.ids)] + self.ids)
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'FoconDisplayObjectList':
+		num_objects = data[0]
+		return cls(ids=[int(x) for x in data[1:1 + num_objects]])
+
+@dataclass
+class FoconDisplayRedrawSpecification:
+	composition: FoconDisplayDrawComposition
+	objects: FoconDisplayObjectList
+
+	def pack(self) -> bytes:
+		return bytes([ord(self.composition.value)]) + self.objects.pack()
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'FoconDisplayRedrawSpecification':
+		return cls(
+			composition=FoconDisplayDrawComposition(data[0]),
+			objects=FoconDisplayObjectList.unpack(data[1:]),
+		)
+
+@dataclass
+class FoconDisplayUndrawSpecification:
+	update: bool
+	objects: FoconDisplayObjectList
+
+	def pack(self) -> bytes:
+		return bytes([1 if self.update else 0]) + self.objects.pack()
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'FoconDisplayRedrawSpecification':
+		return cls(
+			update=bool(data[0]),
+			objects=FoconDisplayObjectList.unpack(data[1:]),
+		)
+
 @dataclass
 class FoconDisplayObject:
 	object_id:   int
@@ -430,13 +517,13 @@ class FoconDisplayObject:
 	y_start:     int = 0
 	effect:      FoconDisplayObjectEffect = FoconDisplayObjectEffect.Appear
 	count:       int = 1
-	delay:       int = 1
+	duration:    int = 1
 	data:        bytes = b''
 
 	def pack(self) -> bytes:
 		return (bytes([self.object_id, ord(self.composition.value)]) +
 		        pack('>HHHH', self.x_start, self.y_start, self.x_end, self.y_end) +
-		        bytes([ord(self.effect.value), self.count, self.output_id, self.delay, self.unk0E, self.unk0F]) +
+		        bytes([ord(self.effect.value), self.count, self.output_id, self.duration, self.unk0E, self.unk0F]) +
 		        self.data)
 
 	@classmethod
@@ -452,7 +539,7 @@ class FoconDisplayObject:
 			effect=FoconDisplayObjectEffect(chr(data[10])),
 			count=data[11],
 			output_id=data[12],
-			delay=data[13],
+			duration=data[13],
 			unk0E=data[14],
 			unk0F=data[15],
 			data=data[16:],
@@ -466,6 +553,17 @@ class FoconDisplayObject:
 	def make_pixel_data(cls, data: bytes, width: int = 6, height: int = 12) -> bytes:
 		return pack('>HH', height, width) + data
 
+@dataclass
+class FoconDisplayDrawStatus:
+	object_id: int
+	status:    int
+
+	def pack(self) -> bytes:
+		return bytes([self.object_id, self.status])
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'FoconDisplayDrawStatus':
+		return cls(object_id=data[0], status=data[1])
 
 
 class FoconDisplay:
@@ -484,17 +582,168 @@ class FoconDisplay:
 	def use_config(self, config: FoconDisplayConfiguration) -> None:
 		self.current_config = config
 
-
 	def send_command(self, command: FoconDisplayCommand, payload: bytes = b'') -> bytes:
 		return self.device.send_command(command.value, payload=payload)
 
 
+	## Commands
+
+	# 0041
+	def get_device_info(self) -> FoconDeviceInfo:
+		return self.device.get_device_info()
+
+	# 3141
+	def get_display_info(self) -> FoconDisplayInfo:
+		response = self.send_command(FoconDisplayCommand.Info)
+		return FoconDisplayInfo.unpack(response)
+
+	# 0042
+	@dangerous
+	def self_destruct(self) -> None:
+		self.send_command(FoconDisplayCommand.SelfDestruct)
+
+	# 0043
+	def get_status(self) -> FoconDisplayStatus:
+		response = self.send_command(FoconDisplayCommand.Status)
+		return FoconDisplayStatus.unpack(response)
+
+	# 0044
+	def trigger_selftest(self, type: FoconDisplaySelfTestKind) -> bool:
+		response = self.send_command(FoconDisplayCommand.SelfTest, bytes([type.value, 0x00]))
+		if response[0] != type.value:
+			raise ValueError(f'got invalid selftest type response {response[0]} != {type}')
+		return response[1] == 0xff
+
+	# 0045
+	@dangerous
+	def set_config(self, config: FoconDisplayConfiguration) -> None:
+		response = self.send_command(FoconDisplayCommand.SetConfiguration, config.pack())
+
+	# 0046
+	def get_config(self) -> FoconDisplayConfiguration:
+		response = self.send_command(FoconDisplayCommand.GetConfiguration)
+		return FoconDisplayConfiguration.unpack(response)
+
+	# 0047
+	@dangerous
+	def set_unk47(self, p1: int, p2: int) -> None:
+		self.send_command(FoconDisplayCommand.SetUnk47, bytes([p1, p2]))
+
+	# 0048
+	def clear(self, output_ids: Optional[List[int]] = None, x: Optional[Tuple[int, int]] = None, y: Optional[Tuple[int, int]] = None) -> None:
+		config = self.get_current_config()
+
+		if x is not None and y is None:
+			y = (config.y_start, config.y_end)
+		if y is not None and x is None:
+			x = (config.x_start, config.x_end)
+		if x is not None and isinstance(x, int):
+			x = (x, config.x_end)
+		if y is not None and isinstance(y, int):
+			y = (y, config.y_end)
+
+		if output_ids is None and x is None and y is None:
+			spec = FoconDisplayClearSpecification(
+				mode=FoconDisplayOutputSelector.AllFrom,
+				output_id=0,
+			)
+			self.send_command(FoconDisplayCommand.Clear, spec.pack())
+		else:
+			range_ids = []
+			for i in range(len(config.outputs)):
+				range_ids.append(i + 1)
+				if output_ids is None or i not in output_ids or x or y:
+					for output_id in range_ids:
+						if x and y:
+							spec = FoconDisplayClearSpecification(
+								mode=FoconDisplayOutputSelector.SingleArea,
+								output_id=output_id,
+								x_start=x[0],
+								x_end=x[1],
+								y_start=y[0],
+								y_end=y[1],
+							)
+						else:
+							spec = FoconDisplayClearSpecification(
+								mode=FoconDisplayOutputSelector.Single,
+								output_id=output_id,
+							)
+						self.send_command(FoconDisplayCommand.Clear, spec.pack())
+					range_ids = []
+			if range_ids:
+				spec = FoconDisplayClearSpecification(
+					mode=FoconDisplayOutputSelector.AllFrom,
+					output_ids=range_ids[0]
+				)
+				self.send_command(FoconDisplayCommand.Clear, spec.pack())
+
+	# 0049
+	def draw(self) -> None:
+		raise NotImplementedError()
+
+	# 004A
+	def print(self, message: str, composition: FoconDisplayDrawComposition = None, effect: FoconDisplayObjectEffect = None, count: Optional[int] = None, duration: Optional[int] = None) -> FoconDisplayDrawStatus:
+		config = self.get_current_config()
+		cmd = FoconDisplayObject(
+			object_id=0xFF,
+			output_id=1,
+			composition=composition or FoconDisplayDrawComposition.Replace,
+			effect=effect or FoconDisplayObjectEffect.Appear,
+			x_end=config.x_end,
+			y_end=config.y_end,
+			unk0E=255,
+			unk0F=255,
+			count=count or 1,
+			duration=duration or 1,
+			data=FoconDisplayObject.make_string_data(message),
+		)
+		response = self.send_command(FoconDisplayCommand.DrawString, cmd.pack())
+		return FoconDisplayDrawStatus.unpack(response)
+
+	# 004C
+	def undraw(self, object_ids: List[int], update_screen: bool = True) -> None:
+		spec = FoconDisplayUndrawSpecification(
+			update=update_screen,
+			objects=FoconDisplayObjectList(object_ids),
+		)
+		response = self.send_command(FoconDisplayCommand.Undraw, spec.pack())
+		return FoconDisplayObjectList.unpack(response)
+
+	# 004D
+	def redraw(self, object_ids: List[int], composition: FoconDisplayDrawComposition = None) -> FoconDisplayObjectList:
+		spec = FoconDisplayRedrawSpecification(
+			composition=composition or FoconDisplayObjectEffect.Appear,
+			objects=FoconDisplayObjectList(object_ids),
+		)
+		response = self.send_command(FoconDisplayCommand.Redraw, spec.pack())
+		return FoconDisplayObjectList.unpack(response)
+
+	# 004F
+	def get_product_info(self) -> FoconDisplayProductInfo:
+		response = self.send_command(FoconDisplayCommand.ProductInfo)
+		return FoconDisplayProductInfo.unpack(response)
+
+	# 0050
+	@dangerous
+	def reset_product_info(self) -> None:
+		self.send_command(FoconDisplayCommand.ResetProductInfo)
+
+	# 00F0
+	@dangerous
+	def set_product_info(self, info: FoconDisplayProductInfo) -> None:
+		self.send_command(FoconDisplayCommand.SetProductInfo, info.pack())
+
+	# 00F1
+	def verify_product_info(self) -> None:
+		self.send_command(FoconDisplayCommand.VerifyProductInfo)
+
+	# FFF0
 	def parse_dump_response(self, type: FoconDisplayDumpType, response: bytes) -> str:
 		if response[0] != type.value:
 			raise ValueError(f'invalid dump response type: {response[0]} != {type}')
 		return decode_str(response[2:])
 
-	def do_dump(self, type: FoconDisplayDumpType) -> str:
+	def dump(self, type: FoconDisplayDumpType) -> str:
 		response = self.send_command(FoconDisplayCommand.Dump, bytes([type.value, 0x00]))
 		return self.parse_dump_response(type, response)
 
@@ -502,79 +751,15 @@ class FoconDisplay:
 		for msg in self.device.recv_messages(cmd=FoconDisplayCommand.Dump.value):
 			yield self.parse_dump_response(type, msg.value)
 
-	def get_device_info(self) -> FoconDeviceInfo:
-		return self.device.get_device_info()
-
-
-	def print(self, message: str, composition: FoconDisplayDrawComposition = None, effect: FoconDisplayObjectEffect = None) -> bytes:
-		config = self.get_current_config()
-		cmd = FoconDisplayObject(
-			object_id=0xFF,
-			output_id=1,
-			composition=composition or FoconDisplayDrawComposition.Replace,
-			effect=effect or FoconDisplayObjectEffect.Appear,
-			x_end=config.x_max,
-			y_end=config.y_max,
-			unk0E=255,
-			unk0F=81,
-			data=FoconDisplayObject.make_string_data(message),
-		)
-		return self.send_command(FoconDisplayCommand.DrawString, cmd.pack())
-
-	@dangerous
-	def self_destruct(self) -> None:
-		self.send_command(FoconDisplayCommand.SelfDestruct)
-
-	def get_status(self) -> FoconDisplayStatus:
-		response = self.send_command(FoconDisplayCommand.Status)
-		return FoconDisplayStatus.unpack(response)
-
-	def trigger_selftest(self, type: FoconDisplaySelfTestKind) -> bool:
-		response = self.send_command(FoconDisplayCommand.SelfTest, bytes([type.value, 0x00]))
-		if response[0] != type.value:
-			raise ValueError(f'got invalid selftest type response {response[0]} != {type}')
-		return response[1] == 0xff
-
-	def get_config(self) -> FoconDisplayConfiguration:
-		response = self.send_command(FoconDisplayCommand.GetConfiguration)
-		return FoconDisplayConfiguration.unpack(response)
-
-	@dangerous
-	def set_config(self, config: FoconDisplayConfiguration) -> None:
-		response = self.send_command(FoconDisplayCommand.SetConfiguration, config.pack())
-
-	@dangerous
-	def set_unk47(self, p1: int, p2: int) -> None:
-		self.send_command(FoconDisplayCommand.SetUnk47, bytes([p1, p2]))
-
-	def get_product_info(self) -> FoconDisplayProductInfo:
-		response = self.send_command(FoconDisplayCommand.ProductInfo)
-		return FoconDisplayProductInfo.unpack(response)
-
-	@dangerous
-	def reset_product_info(self) -> None:
-		self.send_command(FoconDisplayCommand.ResetProductInfo)
-
-	def verify_product_info(self) -> None:
-		self.send_command(FoconDisplayCommand.VerifyProductInfo)
-
-	@dangerous
-	def set_product_info(self, info: FoconDisplayProductInfo) -> None:
-		self.send_command(FoconDisplayCommand.SetProductInfo, info.pack())
-
-	def get_display_info(self) -> FoconDisplayInfo:
-		response = self.send_command(FoconDisplayCommand.Info)
-		return FoconDisplayInfo.unpack(response)
-
 	def get_memory_stats(self) -> str:
-		return self.do_dump(FoconDisplayDumpType.MemoryStats)
+		return self.dump(FoconDisplayDumpType.MemoryStats)
 
 	def get_network_stats(self) -> str:
-		return self.do_dump(FoconDisplayDumpType.NetworkStats)
+		return self.dump(FoconDisplayDumpType.NetworkStats)
 
 	def get_task_stats(self) -> Iterator[str]:
-		self.do_dump(FoconDisplayDumpType.TaskStats)
+		self.dump(FoconDisplayDumpType.TaskStats)
 		yield from self.recv_dump_messages(FoconDisplayDumpType.TaskStats)
 
 	def get_sensor_stats(self) -> str:
-		return self.do_dump(FoconDisplayDumpType.EnvironmentBrightness)
+		return self.dump(FoconDisplayDumpType.EnvironmentBrightness)

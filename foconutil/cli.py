@@ -78,16 +78,6 @@ def main() -> None:
         get_info_parser = display_subcommands.add_parser('info')
         get_info_parser.set_defaults(_display_handler=do_display_info)
 
-        def do_display_get_boot_info(display, args):
-                print(display.get_boot_info())
-        get_boot_info_parser = display_subcommands.add_parser('boot-info')
-        get_boot_info_parser.set_defaults(_display_handler=do_display_get_boot_info)
-
-        def do_display_get_ext_info(display, args):
-                print(display.get_ext_info())
-        get_ext_info_parser = display_subcommands.add_parser('ext-info')
-        get_ext_info_parser.set_defaults(_display_handler=do_display_get_ext_info)
-
         def do_display_get_config(display, args):
                 print(display.get_current_config())
         get_config_parser = display_subcommands.add_parser('get-config')
@@ -135,11 +125,6 @@ def main() -> None:
         get_product_info_parser = display_subcommands.add_parser('product-info')
         get_product_info_parser.set_defaults(_display_handler=do_display_product_info)
 
-        def do_display_test_disp_304(display, args):
-                print(display.test_disp_304())
-        test_disp_304_parser = display_subcommands.add_parser('test-disp-304')
-        test_disp_304_parser.set_defaults(_display_handler=do_display_test_disp_304)
-
         # Display drawing commands
 
         def do_display_draw(display, args):
@@ -163,17 +148,53 @@ def main() -> None:
 
         def add_display_draw_args(parser):
                 parser.add_argument('-c', '--config', type=argparse.FileType('a+b'), help='path to file containing display configuration to use (will be written if specified but empty or invalid)')
-                parser.add_argument('-C', '--composition', type=FoconDisplayDrawComposition.parse, choices=list(COMPOSITION_NAMES))
-                parser.add_argument('-f', '--effect', type=FoconDisplayObjectEffect.parse, choices=list(EFFECT_NAMES))
+                parser.add_argument('-C', '--composition', type=FoconDisplayDrawComposition.parse) #choices=list(COMPOSITION_NAMES))
+                parser.add_argument('-f', '--effect', type=FoconDisplayObjectEffect.parse) #, choices=list(EFFECT_NAMES))
+                parser.add_argument('-n', '--count', type=int)
+                parser.add_argument('-t', '--duration', type=int)
                 parser.set_defaults(_display_handler=do_display_draw, _display_draw_handler=None)
 
+        def do_display_clear(display, args):
+                print(display.clear(args.output_id or None, x=args.x, y=args.y))
+
+        def parse_range(s: str):
+                if ':' in s:
+                        start, end = s.split(':', 1)
+                        return (int(start), int(end))
+                else:
+                        return int(s)
+
+        clear_parser = display_subcommands.add_parser('clear')
+        add_display_draw_args(clear_parser)
+        clear_parser.set_defaults(_display_draw_handler=do_display_clear)
+        clear_parser.add_argument('-o', '--output-id', action='append', help='output ID to clear')
+        clear_parser.add_argument('-x', '--x', type=parse_range, help='X area')
+        clear_parser.add_argument('-y', '--y', type=parse_range, help='Y area')
+
         def do_display_print(display, args):
-                print(display.print(args.message, effect=args.effect))
+                print(display.print(args.message, effect=args.effect, composition=args.composition, count=args.count, duration=args.duration))
 
         print_parser = display_subcommands.add_parser('print')
         add_display_draw_args(print_parser)
         print_parser.set_defaults(_display_draw_handler=do_display_print)
         print_parser.add_argument('message')
+
+        def do_display_redraw(display, args):
+                print(display.redraw(args.ID, composition=args.composition))
+
+        redraw_parser = display_subcommands.add_parser('redraw')
+        add_display_draw_args(redraw_parser)
+        redraw_parser.set_defaults(_display_draw_handler=do_display_redraw)
+        redraw_parser.add_argument('ID', default=[255], type=int, nargs='*')
+
+        def do_display_undraw(display, args):
+                print(display.undraw(args.ID, update_screen=args.update))
+
+        undraw_parser = display_subcommands.add_parser('undraw')
+        add_display_draw_args(undraw_parser)
+        undraw_parser.set_defaults(_display_draw_handler=do_display_undraw)
+        undraw_parser.add_argument('ID', default=[255], type=int, nargs='*')
+        undraw_parser.add_argument('-N', '--no-update', action='store_false', dest='update', default=True)
 
         def do_display_flood(display, args):
                 print(display.flood())
