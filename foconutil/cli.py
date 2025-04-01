@@ -145,18 +145,19 @@ def main() -> None:
         def do_display_draw(display, args):
                 # Obtain (and store) config if needed
                 config = None
-                config_bytes = args.config.read() if args.config else None
-                if config_bytes:
+                if args.config:
+                        args.config.seek(0)
                         try:
-                                config = FoconDisplayConfiguration.unpack(config_bytes)
+                                config = FoconDisplayConfiguration.unpack(args.config.read())
                         except:
                                 print('display configuration was corrupted, re-reading')
-                                config_bytes = None
+
                 if not config:
                         config = display.get_current_config()
                         if args.config:
                                 args.config.truncate(0)
                                 args.config.write(config.pack())
+
                 display.use_config(config)
                 return args._display_draw_handler(display, args)
 
