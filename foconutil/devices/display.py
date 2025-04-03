@@ -734,7 +734,7 @@ class FoconDisplay:
 		width = spec.x_end - spec.x_start + 1
 		height = spec.y_end - spec.y_start + 1
 
-		obj = FoconDisplayPixelObject(spec, width, [[on] * height] * width)
+		obj = FoconDisplayPixelObject(spec, height, [[on] * height] * width)
 		response = self.send_command(FoconDisplayCommand.DrawPixels, obj.pack())
 		return FoconDisplayDrawStatus.unpack(response)
 
