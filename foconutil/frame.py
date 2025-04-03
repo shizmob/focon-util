@@ -83,6 +83,14 @@ class FoconFrame:
 		assert src_id is not None
 		return cls(src_id=src_id, dest_id=dest_id, num=num, total=total, data=pdata), data
 
+	@property
+	def is_ack(self):
+		return not self.data and self.total > 0
+
+	@property
+	def is_nak(self):
+		return not self.data and self.total == 0
+
 	def __repr__(self) -> str:
 		s = f'{self.__class__.__name__} #{self.num}/#{self.total} {{ {self.src_id} -> {self.dest_id}'
 		if self.data:

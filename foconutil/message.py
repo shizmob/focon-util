@@ -77,7 +77,7 @@ class FoconMessageBus:
 		return self.bus.send_message(dest_id, message.pack())
 
 	def recv_message(self, dest_id: int | None, cmd: int | None = None) -> FoconMessage:
-		data = self.bus.recv_message(partial(self.check_message, dest_id, cmd))
+		data = self.bus.recv_message(dest_id, partial(self.check_message, dest_id, cmd))
 		assert data is not None
 
 		msg, remainder_data = FoconMessage.unpack(data)
