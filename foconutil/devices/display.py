@@ -59,7 +59,6 @@ class FoconDisplayInfo(FoconDeviceInfo):
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayInfo':
 		di = FoconDeviceInfo.unpack(data)
-		print(data)
 		return cls(
 			kind=di.kind,
 			mode=di.mode,

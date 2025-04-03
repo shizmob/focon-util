@@ -235,7 +235,6 @@ def main() -> None:
                         image = image.convert('1')
                 values = []
                 for x in range(image.width):
-                        print(image.getpixel((x, 0)))
                         values.append([bool(image.getpixel((x, y))) for y in range(image.height)])
                 print(display.draw(values, image.height, spec))
 
