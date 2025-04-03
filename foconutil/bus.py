@@ -20,20 +20,23 @@ class FoconTransport(Protocol):
 class FoconSerialTransport(FoconTransport):
 	BAUDRATE = 57600
 
-	def __init__(self, device: str, sleep_after_tx: float | None = 0.0002, flow_control: bool = True) -> None:
+	def __init__(self, device: str, sleep_after_tx: float | None = 0.0002, flow_control: bool = True, debug=False) -> None:
 		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=flow_control)
 		self.sleep_after_tx = sleep_after_tx
 		self.serial.reset_output_buffer()
 		self.serial.reset_input_buffer()
+		self.debug = debug
 
 	def read(self) -> bytes:
 		self.serial.setRTS(0)
 		data: bytes = self.serial.read()
-		LOG.debug('<<: %s', data.hex())
+		if self.debug:
+			LOG.debug('  <: %s', data.hex())
 		return data
 
 	def write(self, data: bytes) -> None:
-		LOG.debug('>>: %s', data.hex())
+		if self.debug:
+			LOG.debug('  >: %s', data.hex())
 		self.serial.setRTS(1)
 		self.serial.write(data)
 		self.serial.flush()
@@ -42,11 +45,12 @@ class FoconSerialTransport(FoconTransport):
 		self.serial.setRTS(0)
 
 class FoconBus:
-	def __init__(self, transport: FoconTransport, src_id: int) -> None:
+	def __init__(self, transport: FoconTransport, src_id: int, debug: bool = False) -> None:
 		self.transport = transport
 		self.src_id = src_id
 		self.pending_data = b''
 		self.pending_frames: dict[int, list[FoconFrame]] = {}
+		self.debug = debug
 
 	def send_message(self, dest_id: int | None, data: bytes) -> None:
 		max_frame_size = 512
@@ -59,12 +63,14 @@ class FoconBus:
 				self.recv_ack(dest_id)
 
 	def send_frame(self, frame: FoconFrame) -> None:
-		LOG.debug('>> frame: %r', frame)
+		if self.debug:
+			LOG.debug(' > frame: %r', frame)
 		self.transport.write(frame.pack())
 
 	def send_ack(self, dest_id: int) -> None:
 		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
-		LOG.debug('>> ack: %r', dest_id)
+		if self.debug:
+			LOG.debug(' > ack: %r', dest_id)
 		self.transport.write(frame.pack())
 
 	def recv_message(self, checker: Callable[[bytes | None], bool] | None = None) -> bytes | None:
@@ -100,7 +106,8 @@ class FoconBus:
 		self.pending_data += self.transport.read()
 		try:
 			frame, self.pending_data = FoconFrame.unpack(self.pending_data)
-			LOG.debug('<< frame: %r', frame)
+			if self.debug:
+				LOG.debug(' < frame: %r', frame)
 			return frame
 		except EOFError:
 			return None

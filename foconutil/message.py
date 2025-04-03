@@ -56,9 +56,10 @@ class FoconMessage:
 		return s
 
 class FoconMessageBus:
-	def __init__(self, bus: FoconBus, src_id: int | None = None) -> None:
+	def __init__(self, bus: FoconBus, src_id: int | None = None, debug: bool = False) -> None:
 		self.bus = bus
 		self.src_id = src_id
+		self.debug = debug
 
 	def check_message(self, dest_id: int | None, cmd: int | None, data: bytes | None) -> bool:
 		if data is None:
@@ -71,7 +72,8 @@ class FoconMessageBus:
 		return dest_id in (message.src_id, None) and message.dest_id in (self.src_id, None) and cmd in (None, message.cmd)
 
 	def send_message(self, dest_id: int | None, message: FoconMessage) -> None:
-		LOG.debug('>> msg: %r', message)
+		if self.debug:
+			LOG.debug('> msg: %r', message)
 		return self.bus.send_message(dest_id, message.pack())
 
 	def recv_message(self, dest_id: int | None, cmd: int | None = None) -> FoconMessage:
@@ -79,7 +81,8 @@ class FoconMessageBus:
 		assert data is not None
 
 		msg, remainder_data = FoconMessage.unpack(data)
-		LOG.debug('<< msg: %r', msg)
+		if self.debug:
+			LOG.debug('< msg: %r', msg)
 		if remainder_data:
 			raise ValueError(f'Remainder data: {remainder_data!r}')
 		return msg
@@ -93,7 +96,8 @@ class FoconMessageBus:
 			if not data:
 				break
 			msg, remainder_data = FoconMessage.unpack(data)
-			LOG.debug('<< msg: %r', msg)
+			if self.debug:
+				LOG.debug('< msg: %r', msg)
 			if remainder_data:
 				raise ValueError(f'Remainder data: {remainder_data!r}')
 			messages.append(msg)

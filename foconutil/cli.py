@@ -9,7 +9,7 @@ def main() -> None:
         p = argparse.ArgumentParser()
         p.add_argument('-d', '--device', default='/dev/ttyUSB0', help='bus device')
         p.add_argument('--no-flow-control', action='store_false', dest='flow_control', default=True, help='disable hardware flow control')
-        p.add_argument('-D', '--debug', action='store_true', help='debug log')
+        p.add_argument('-D', '--debug', action='count', default=0, help='debug log')
         p.add_argument('-s', '--source-id', type=int, default=14, help='source device ID')
         p.add_argument('-i', '--id', type=int, default=0, help='device ID')
         p.set_defaults(_handler=None)
@@ -20,8 +20,10 @@ def main() -> None:
         # General subcommands
 
         def do_info(args):
-                bus = FoconMessageBus(FoconBus(FoconSerialTransport(args.device, flow_control=args.flow_control), args.source_id), args.source_id)
-                device = FoconDevice(bus, args.id)
+                transport = FoconSerialTransport(args.device, flow_control=args.flow_control, debug=args.debug > 2)
+                bus = FoconBus(transport, args.source_id, debug=args.debug > 1)
+                msg_bus = FoconMessageBus(bus, args.source_id, debug=args.debug > 0)
+                device = FoconDevice(msg_bus, args.id)
                 device_info = device.get_device_info()
                 print('boot:')
                 print('  mode:   ', device_info.mode.name.lower())
@@ -39,8 +41,10 @@ def main() -> None:
         # Display subcommands
 
         def do_display(args):
-                bus = FoconMessageBus(FoconBus(FoconSerialTransport(args.device), args.source_id), args.source_id)
-                device = FoconDevice(bus, args.id)
+                transport = FoconSerialTransport(args.device, flow_control=args.flow_control, debug=args.debug > 2)
+                bus = FoconBus(transport, args.source_id, debug=args.debug > 1)
+                msg_bus = FoconMessageBus(bus, args.source_id, debug=args.debug > 0)
+                device = FoconDevice(msg_bus, args.id)
                 display = FoconDisplay(device)
 
                 args._display_handler(display, args)
