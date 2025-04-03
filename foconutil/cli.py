@@ -137,7 +137,7 @@ def main() -> None:
 
         # Display drawing commands
 
-        def do_display_draw(display, args):
+        def do_display_draw_base(display, args):
                 # Obtain (and store) config if needed
                 config = None
                 if args.config:
@@ -160,7 +160,7 @@ def main() -> None:
                 parser.add_argument('-c', '--config', type=argparse.FileType('a+b'), help='path to file containing display configuration to use (will be written if specified but empty or invalid)')
                 parser.add_argument('-C', '--composition', type=FoconDisplayDrawComposition.parse) #choices=list(COMPOSITION_NAMES))
                 parser.add_argument('-f', '--effect', type=FoconDisplayDrawEffect.parse) #, choices=list(EFFECT_NAMES))
-                parser.set_defaults(_display_handler=do_display_draw, _display_draw_handler=None)
+                parser.set_defaults(_display_handler=do_display_draw_base, _display_draw_handler=None)
 
         def do_display_draw_object(display, args):
                 config = display.get_current_config()
@@ -227,6 +227,22 @@ def main() -> None:
         add_display_draw_object_args(print_parser)
         print_parser.set_defaults(_display_draw_object_handler=do_display_print)
         print_parser.add_argument('message')
+
+        def do_display_draw(display, spec, args):
+                import PIL.Image
+                image = PIL.Image.open(args.file)
+                if image.mode != '1':
+                        image = image.convert('1')
+                values = []
+                for x in range(image.width):
+                        print(image.getpixel((x, 0)))
+                        values.append([bool(image.getpixel((x, y))) for y in range(image.height)])
+                print(display.draw(values, image.height, spec))
+
+        draw_parser = display_subcommands.add_parser('draw')
+        add_display_draw_object_args(draw_parser)
+        draw_parser.set_defaults(_display_draw_object_handler=do_display_draw)
+        draw_parser.add_argument('file', type=argparse.FileType('rb'))
 
         def do_display_fill(display, spec, args):
                 print(display.fill(spec, bool(args.VALUE)))

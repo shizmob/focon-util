@@ -590,7 +590,7 @@ class FoconDisplayPixelObject:
 				x = 0
 				for i in range(8):
 					if row + i < len(col):
-						x |= col[row + i] << i
+						x |= col[row + i] << (7 - i)
 					else:
 						break
 				b.append(x)
@@ -731,13 +731,16 @@ class FoconDisplay:
 				self.send_command(FoconDisplayCommand.Clear, spec.pack())
 
 	# 0049
+	def draw(self, values: List[int], height: int, spec: FoconDisplayDrawSpec) -> FoconDisplayDrawStatus:
+		obj = FoconDisplayPixelObject(spec, height, values)
+		response = self.send_command(FoconDisplayCommand.DrawPixels, obj.pack())
+		return FoconDisplayDrawStatus.unpack(response)
+
 	def fill(self, spec: FoconDisplayDrawSpec, on: bool = True) -> FoconDisplayDrawStatus:
 		width = spec.x_end - spec.x_start + 1
 		height = spec.y_end - spec.y_start + 1
-
-		obj = FoconDisplayPixelObject(spec, height, [[on] * height] * width)
-		response = self.send_command(FoconDisplayCommand.DrawPixels, obj.pack())
-		return FoconDisplayDrawStatus.unpack(response)
+		values = [[on] * height] * width
+		return self.draw(values, height, spec)
 
 	# 004A
 	def print(self, message: str, spec: FoconDisplayDrawSpec) -> FoconDisplayDrawStatus:
