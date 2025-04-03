@@ -77,14 +77,14 @@ class FoconBus:
 		while True:
 			found = False
 			for src_id, frames in self.pending_frames.items():
-				if not frames:
+				if not frames or not frames[-1]:
 					continue
 				if frames[-1].total not in (0, len(frames)):
 					continue
 				if frames[-1].total == 0:
 					frame_data = None
 				else:
-					frame_data = b''.join(f.data for f in sorted(frames, key=lambda f: f.num))
+					frame_data = b''.join(f.data for f in sorted([f for f in frames if f], key=lambda f: f.num))
 				if not checker or checker(frame_data):
 					found = True
 					break
@@ -118,6 +118,7 @@ class FoconBus:
 
 	def recv_ack(self, dest_id: int) -> None:
 		self.recv_message(lambda data: data is None)
+		self.pending_frames.setdefault(dest_id, []).append(None)
 
 	def recv_next_message(self, dest_id: int, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
 		self.send_ack(dest_id)
