@@ -567,21 +567,32 @@ class FoconDisplayTextObject:
 			text=data[18:].rstrip(b'\x00').decode(Focon850.NAME),
 		)
 
+def round_up(x, a):
+	return x + (a - (x % a)) % a
+
 @dataclass
 class FoconDisplayPixelObject:
 	spec: FoconDisplayDrawSpec
-	width: int
 	height: int
-	values: List[bool]
+	values: List[List[bool]]
+
+	@property
+	def width(self) -> int:
+		return len(self.values)
 
 	def pack(self) -> bytes:
 		b = bytearray(self.spec.pack())
 		b.extend(pack('>HH', self.width, self.height))
-		for off in range(0, len(self.values) - 1, 8):
-			x = 0
-			for i in range(min(len(self.values) - off, 8)):
-				x |= self.values[off + i] << i
-			b.append(x)
+		for col in self.values:
+			nrows = round_up(self.height, 16)
+			for row in range(0, nrows - 1, 8):
+				x = 0
+				for i in range(8):
+					if row + i < len(col):
+						x |= col[row + i] << i
+					else:
+						break
+				b.append(x)
 		return b
 
 	@classmethod
@@ -723,7 +734,7 @@ class FoconDisplay:
 		width = spec.x_end - spec.x_start + 1
 		height = spec.y_end - spec.y_start + 1
 
-		obj = FoconDisplayPixelObject(spec, width=width, height=height, values=[on] * width * height)
+		obj = FoconDisplayPixelObject(spec, width, [[on] * height] * width)
 		response = self.send_command(FoconDisplayCommand.DrawPixels, obj.pack())
 		return FoconDisplayDrawStatus.unpack(response)
 
