@@ -153,13 +153,36 @@ def main() -> None:
         def add_display_draw_args(parser):
                 parser.add_argument('-c', '--config', type=argparse.FileType('a+b'), help='path to file containing display configuration to use (will be written if specified but empty or invalid)')
                 parser.add_argument('-C', '--composition', type=FoconDisplayDrawComposition.parse) #choices=list(COMPOSITION_NAMES))
-                parser.add_argument('-f', '--effect', type=FoconDisplayObjectEffect.parse) #, choices=list(EFFECT_NAMES))
-                parser.add_argument('-n', '--count', type=int)
-                parser.add_argument('-t', '--duration', type=int)
+                parser.add_argument('-f', '--effect', type=FoconDisplayDrawEffect.parse) #, choices=list(EFFECT_NAMES))
                 parser.set_defaults(_display_handler=do_display_draw, _display_draw_handler=None)
 
-        def do_display_clear(display, args):
-                print(display.clear(args.output_id or None, x=args.x, y=args.y))
+        def do_display_draw_object(display, args):
+                config = display.get_current_config()
+
+                # build object spec
+                output_ids = args.output_id or [1]
+                x = args.x or 0
+                y = args.y or 0
+                width = args.width if args.width is not None else config.x_end
+                height = args.height if args.height is not None else config.y_end
+                for output_id in output_ids:
+                        spec = FoconDisplayDrawSpec(
+                                object_id=args.object_id,
+                                output_id=output_id,
+                                composition=args.composition or FoconDisplayDrawComposition.Replace,
+                                effect=args.effect or FoconDisplayDrawEffect.Appear,
+                                x_start=x,
+                                y_start=y,
+                                x_end=(x + width) - 1,
+                                y_end=(y + height) - 1,
+                                unk0E=255,
+                                unk0F=255,
+                                count=args.count or 1,
+                                duration=args.duration or 1,
+                        )
+                        r = args._display_draw_object_handler(display, spec, args)
+                        if r not in (None, 0):
+                                sys.exit(r)
 
         def parse_range(s: str):
                 if ':' in s:
@@ -168,20 +191,44 @@ def main() -> None:
                 else:
                         return int(s)
 
+        def add_display_draw_object_args(parser):
+                add_display_draw_args(parser)
+                parser.add_argument('-n', '--count', type=int)
+                parser.add_argument('-t', '--duration', type=int)
+                parser.add_argument('-i', '--object-id', type=int, default=0xFF, help='object ID')
+                parser.add_argument('-o', '--output-id', action='append', type=int, help='output ID(s)')
+                parser.add_argument('-x', '--x', type=int, help='X position')
+                parser.add_argument('-W', '--width', type=int, help='X size')
+                parser.add_argument('-y', '--y', type=int, help='Y position')
+                parser.add_argument('-H', '--height', type=int, help='Y size')
+                parser.set_defaults(_display_draw_handler=do_display_draw_object, _display_draw_object_handler=None)
+
+        def do_display_clear(display, args):
+                for output_id in args.OUTPUT or [None]:
+                        print(display.clear(output_id or None, x=args.x, y=args.y))
+
         clear_parser = display_subcommands.add_parser('clear')
         add_display_draw_args(clear_parser)
         clear_parser.set_defaults(_display_draw_handler=do_display_clear)
-        clear_parser.add_argument('-o', '--output-id', action='append', help='output ID to clear')
         clear_parser.add_argument('-x', '--x', type=parse_range, help='X area')
         clear_parser.add_argument('-y', '--y', type=parse_range, help='Y area')
+        clear_parser.add_argument('OUTPUT', nargs='*')
 
-        def do_display_print(display, args):
-                print(display.print(args.message, effect=args.effect, composition=args.composition, count=args.count, duration=args.duration))
+        def do_display_print(display, spec, args):
+                print(display.print(args.message, spec=spec))
 
         print_parser = display_subcommands.add_parser('print')
-        add_display_draw_args(print_parser)
-        print_parser.set_defaults(_display_draw_handler=do_display_print)
+        add_display_draw_object_args(print_parser)
+        print_parser.set_defaults(_display_draw_object_handler=do_display_print)
         print_parser.add_argument('message')
+
+        def do_display_fill(display, spec, args):
+                print(display.fill(spec, bool(args.VALUE)))
+
+        fill_parser = display_subcommands.add_parser('fill')
+        add_display_draw_object_args(fill_parser)
+        fill_parser.set_defaults(_display_draw_object_handler=do_display_fill)
+        fill_parser.add_argument('VALUE', type=int, nargs='?', default=1)
 
         def do_display_redraw(display, args):
                 print(display.redraw(args.ID, composition=args.composition))

@@ -375,7 +375,7 @@ COMPOSITION_NAMES = {
 	'remove': FoconDisplayDrawComposition.Remove,
 }
 
-class FoconDisplayObjectEffect(Enum):
+class FoconDisplayDrawEffect(Enum):
 	UnkU = 'U'
 	UnkD = 'D'
 	LeftScroll = 'L'
@@ -385,17 +385,17 @@ class FoconDisplayObjectEffect(Enum):
 	Blink = 'V'
 
 	@classmethod
-	def parse(cls, s: str) -> 'FoconDisplayObjectEffect':
+	def parse(cls, s: str) -> 'FoconDisplayDrawEffect':
 		return EFFECT_NAMES[s]
 
 EFFECT_NAMES = {
-	'scroll': FoconDisplayObjectEffect.LeftScroll,
-	'left-scroll': FoconDisplayObjectEffect.LeftScroll,
-	'right-scroll': FoconDisplayObjectEffect.RightScroll,
-	'appear': FoconDisplayObjectEffect.Appear,
-	'none': FoconDisplayObjectEffect.Appear,
-	'disappear': FoconDisplayObjectEffect.Disappear,
-	'blink': FoconDisplayObjectEffect.Blink,
+	'scroll': FoconDisplayDrawEffect.LeftScroll,
+	'left-scroll': FoconDisplayDrawEffect.LeftScroll,
+	'right-scroll': FoconDisplayDrawEffect.RightScroll,
+	'appear': FoconDisplayDrawEffect.Appear,
+	'none': FoconDisplayDrawEffect.Appear,
+	'disappear': FoconDisplayDrawEffect.Disappear,
+	'blink': FoconDisplayDrawEffect.Blink,
 }
 
 
@@ -463,21 +463,21 @@ class FoconDisplayClearSpecification:
 		)
 
 @dataclass
-class FoconDisplayObjectList:
+class FoconDisplayDrawList:
 	ids: List[int]
 
 	def pack(self) -> bytes:
 		return bytes([len(self.ids)] + self.ids)
 
 	@classmethod
-	def unpack(cls, data: bytes) -> 'FoconDisplayObjectList':
+	def unpack(cls, data: bytes) -> 'FoconDisplayDrawList':
 		num_objects = data[0]
 		return cls(ids=[int(x) for x in data[1:1 + num_objects]])
 
 @dataclass
 class FoconDisplayRedrawSpecification:
 	composition: FoconDisplayDrawComposition
-	objects: FoconDisplayObjectList
+	objects: FoconDisplayDrawList
 
 	def pack(self) -> bytes:
 		return bytes([ord(self.composition.value)]) + self.objects.pack()
@@ -486,13 +486,13 @@ class FoconDisplayRedrawSpecification:
 	def unpack(cls, data: bytes) -> 'FoconDisplayRedrawSpecification':
 		return cls(
 			composition=FoconDisplayDrawComposition(data[0]),
-			objects=FoconDisplayObjectList.unpack(data[1:]),
+			objects=FoconDisplayDrawList.unpack(data[1:]),
 		)
 
 @dataclass
 class FoconDisplayUndrawSpecification:
 	update: bool
-	objects: FoconDisplayObjectList
+	objects: FoconDisplayDrawList
 
 	def pack(self) -> bytes:
 		return bytes([1 if self.update else 0]) + self.objects.pack()
@@ -501,11 +501,11 @@ class FoconDisplayUndrawSpecification:
 	def unpack(cls, data: bytes) -> 'FoconDisplayRedrawSpecification':
 		return cls(
 			update=bool(data[0]),
-			objects=FoconDisplayObjectList.unpack(data[1:]),
+			objects=FoconDisplayDrawList.unpack(data[1:]),
 		)
 
 @dataclass
-class FoconDisplayObject:
+class FoconDisplayDrawSpec:
 	object_id:   int
 	output_id:   int
 	unk0E:       int
@@ -515,19 +515,17 @@ class FoconDisplayObject:
 	y_end:       int
 	x_start:     int = 0
 	y_start:     int = 0
-	effect:      FoconDisplayObjectEffect = FoconDisplayObjectEffect.Appear
+	effect:      FoconDisplayDrawEffect = FoconDisplayDrawEffect.Appear
 	count:       int = 1
 	duration:    int = 1
-	data:        bytes = b''
 
 	def pack(self) -> bytes:
 		return (bytes([self.object_id, ord(self.composition.value)]) +
 		        pack('>HHHH', self.x_start, self.y_start, self.x_end, self.y_end) +
-		        bytes([ord(self.effect.value), self.count, self.output_id, self.duration, self.unk0E, self.unk0F]) +
-		        self.data)
+		        bytes([ord(self.effect.value), self.count, self.output_id, self.duration, self.unk0E, self.unk0F]))
 
 	@classmethod
-	def unpack(cls, data: bytes) -> 'FoconDisplayObject':
+	def unpack(cls, data: bytes) -> 'FoconDisplayDrawSpec':
 		x_start, y_start, x_end, y_end = unpack('>HHHH', data[2:10])
 		return cls(
 			object_id=data[0],
@@ -536,22 +534,65 @@ class FoconDisplayObject:
 			y_start=y_start,
 			x_end=x_end,
 			y_end=y_end,
-			effect=FoconDisplayObjectEffect(chr(data[10])),
+			effect=FoconDisplayDrawEffect(chr(data[10])),
 			count=data[11],
 			output_id=data[12],
 			duration=data[13],
 			unk0E=data[14],
 			unk0F=data[15],
-			data=data[16:],
 		)
 
-	@classmethod
-	def make_string_data(cls, message: str, flags: int = 4, font_id: int = 16) -> bytes:
-		return bytes([flags, font_id]) + message.encode(Focon850.NAME) + b'\x00'
+@dataclass
+class FoconDisplayTextObject:
+	spec: FoconDisplayDrawSpec
+	text: str
+	font_size: int = 16
+	flags: int = 4
+
+	def pack(self) -> bytes:
+		b = self.spec.pack()
+		b += bytes([
+			self.flags,
+			self.font_size
+		])
+		b += self.text.encode(Focon850.NAME) + b'\x00'
+		return b
 
 	@classmethod
-	def make_pixel_data(cls, data: bytes, width: int = 6, height: int = 12) -> bytes:
-		return pack('>HH', height, width) + data
+	def unpack(cls, data: bytes) -> 'FoconDisplayTextObject':
+		return cls(
+			spec=FoconDisplayDrawSpec.unpack(data[:16]),
+			flags=data[16],
+			font_size=data[17],
+			text=data[18:].rstrip(b'\x00').decode(Focon850.NAME),
+		)
+
+@dataclass
+class FoconDisplayPixelObject:
+	spec: FoconDisplayDrawSpec
+	width: int
+	height: int
+	values: List[bool]
+
+	def pack(self) -> bytes:
+		b = bytearray(self.spec.pack())
+		b.extend(pack('>HH', self.width, self.height))
+		for off in range(0, len(self.values) - 1, 8):
+			x = 0
+			for i in range(min(len(self.values) - off, 8)):
+				x |= self.values[off + i] << i
+			b.append(x)
+		return b
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'FoconDisplayTextObject':
+		return cls(
+			spec=FoconDisplayDrawSpec.unpack(data[:16]),
+			width=unpack('>H', data[16:18]),
+			height=unpack('>H', data[18:20]),
+			values=[bool(x) for x in data[20:]],
+		)
+
 
 @dataclass
 class FoconDisplayDrawStatus:
@@ -678,45 +719,37 @@ class FoconDisplay:
 				self.send_command(FoconDisplayCommand.Clear, spec.pack())
 
 	# 0049
-	def draw(self) -> None:
-		raise NotImplementedError()
+	def fill(self, spec: FoconDisplayDrawSpec, on: bool = True) -> FoconDisplayDrawStatus:
+		width = spec.x_end - spec.x_start + 1
+		height = spec.y_end - spec.y_start + 1
+
+		obj = FoconDisplayPixelObject(spec, width=width, height=height, values=[on] * width * height)
+		response = self.send_command(FoconDisplayCommand.DrawPixels, obj.pack())
+		return FoconDisplayDrawStatus.unpack(response)
 
 	# 004A
-	def print(self, message: str, composition: FoconDisplayDrawComposition = None, effect: FoconDisplayObjectEffect = None, count: Optional[int] = None, duration: Optional[int] = None) -> FoconDisplayDrawStatus:
-		config = self.get_current_config()
-		cmd = FoconDisplayObject(
-			object_id=0xFF,
-			output_id=1,
-			composition=composition or FoconDisplayDrawComposition.Replace,
-			effect=effect or FoconDisplayObjectEffect.Appear,
-			x_end=config.x_end,
-			y_end=config.y_end,
-			unk0E=255,
-			unk0F=255,
-			count=count or 1,
-			duration=duration or 1,
-			data=FoconDisplayObject.make_string_data(message),
-		)
-		response = self.send_command(FoconDisplayCommand.DrawString, cmd.pack())
+	def print(self, message: str, spec: FoconDisplayDrawSpec) -> FoconDisplayDrawStatus:
+		obj = FoconDisplayTextObject(spec, message)
+		response = self.send_command(FoconDisplayCommand.DrawString, obj.pack())
 		return FoconDisplayDrawStatus.unpack(response)
 
 	# 004C
 	def undraw(self, object_ids: List[int], update_screen: bool = True) -> None:
 		spec = FoconDisplayUndrawSpecification(
 			update=update_screen,
-			objects=FoconDisplayObjectList(object_ids),
+			objects=FoconDisplayDrawList(object_ids),
 		)
 		response = self.send_command(FoconDisplayCommand.Undraw, spec.pack())
-		return FoconDisplayObjectList.unpack(response)
+		return FoconDisplayDrawList.unpack(response)
 
 	# 004D
-	def redraw(self, object_ids: List[int], composition: FoconDisplayDrawComposition = None) -> FoconDisplayObjectList:
+	def redraw(self, object_ids: List[int], composition: FoconDisplayDrawComposition = None) -> FoconDisplayDrawList:
 		spec = FoconDisplayRedrawSpecification(
-			composition=composition or FoconDisplayObjectEffect.Appear,
-			objects=FoconDisplayObjectList(object_ids),
+			composition=composition or FoconDisplayDrawEffect.Appear,
+			objects=FoconDisplayDrawList(object_ids),
 		)
 		response = self.send_command(FoconDisplayCommand.Redraw, spec.pack())
-		return FoconDisplayObjectList.unpack(response)
+		return FoconDisplayDrawList.unpack(response)
 
 	# 004F
 	def get_product_info(self) -> FoconDisplayProductInfo:
