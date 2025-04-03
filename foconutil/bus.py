@@ -50,6 +50,7 @@ class FoconBus:
 		self.src_id = src_id
 		self.pending_data = b''
 		self.pending_frames: dict[int, list[FoconFrame]] = {}
+		self.pending_seqs: dict[int, int] = {}
 		self.debug = debug
 
 	def send_message(self, dest_id: int | None, data: bytes) -> None:
@@ -66,31 +67,37 @@ class FoconBus:
 		if self.debug:
 			LOG.debug(' > frame: %r', frame)
 		self.transport.write(frame.pack())
+		self.pending_seqs.setdefault(frame.dest_id, 0)
+		self.pending_seqs[frame.dest_id] += 1
 
 	def send_ack(self, dest_id: int) -> None:
 		frame = FoconFrame(src_id=self.src_id, dest_id=dest_id, num=0, total=0, data=b'')
 		if self.debug:
 			LOG.debug(' > ack: %r', dest_id)
 		self.transport.write(frame.pack())
+		self.pending_seqs.setdefault(frame.dest_id, 0)
+		self.pending_seqs[frame.dest_id] += 1
 
 	def recv_message(self, checker: Callable[[bytes | None], bool] | None = None) -> bytes | None:
 		while True:
 			found = False
 			for src_id, frames in self.pending_frames.items():
-				if not frames or not frames[-1]:
-					continue
-				if frames[-1].total not in (0, len(frames)):
+				if not frames:
 					continue
 				if frames[-1].total == 0:
 					frame_data = None
+				elif frames[-1].total - self.pending_seqs[src_id] + 1 == len(frames):
+					frame_data = b''.join(f.data for f in sorted(frames, key=lambda f: f.num))
 				else:
-					frame_data = b''.join(f.data for f in sorted([f for f in frames if f], key=lambda f: f.num))
+					continue
 				if not checker or checker(frame_data):
 					found = True
 					break
 
 			if found:
 				del self.pending_frames[src_id]
+				if frame_data is not None:
+					del self.pending_seqs[src_id]
 				return frame_data
 
 			frame = None
@@ -118,7 +125,6 @@ class FoconBus:
 
 	def recv_ack(self, dest_id: int) -> None:
 		self.recv_message(lambda data: data is None)
-		self.pending_frames.setdefault(dest_id, []).append(None)
 
 	def recv_next_message(self, dest_id: int, checker: Callable[[bytes | None], bool] | None) -> bytes | None:
 		self.send_ack(dest_id)
