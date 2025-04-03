@@ -24,10 +24,11 @@ class FoconDisplayCommand(Enum):
 	Undraw       = 0x004C
 	Redraw       = 0x004D
 	# 0x4E is not defined
-	ProductInfo       = 0x004F
-	ResetProductInfo  = 0x0050
-	SetProductInfo    = 0x00F0
-	VerifyProductInfo = 0x00F1
+	GetAssetFont    = 0x004E
+	GetAssetData    = 0x004F
+	ResetAssetData  = 0x0050
+	SetAssetData    = 0x00F0
+	VerifyAssetData = 0x00F1
 	#
 	Info         = 0x3141
 	Dump         = 0xFFF0
@@ -37,7 +38,7 @@ class FoconDisplayCommand(Enum):
 @dataclass
 class FoconDisplayInfo(FoconDeviceInfo):
 	unk08: str
-	product_num: int
+	part_id: int
 	unk1E: str
 	unk29: str
 
@@ -47,7 +48,7 @@ class FoconDisplayInfo(FoconDeviceInfo):
 		# 0x08..0x13
 		b += encode_str(self.unk08, 11)
 		# 0x13..0x1E
-		b += encode_str(str(self.product_num), 11)
+		b += encode_str(str(self.part_id), 11)
 		# 0x1E..0x29
 		b += encode_str(self.unk1E, 11)
 		# 0x29..0x44
@@ -58,20 +59,20 @@ class FoconDisplayInfo(FoconDeviceInfo):
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayInfo':
 		di = FoconDeviceInfo.unpack(data)
-
+		print(data)
 		return cls(
 			kind=di.kind,
 			mode=di.mode,
 			boot_version=di.boot_version,
 			app_version=di.app_version,
 			unk08=decode_str(data[0x08:0x13]),
-			product_num=int(decode_str(data[0x13:0x1e])),
+			part_id=int(decode_str(data[0x13:0x1e])),
 			unk1E=decode_str(data[0x1e:0x29]),
 			unk29=decode_str(data[0x29:0x44]),
 		)
 
 	def __repr__(self) -> str:
-		return super().__repr__().rstrip('} ') + f', unk08: {self.unk08}, product_num: {self.product_num}, unk1E: {self.unk1E}, unk29: {self.unk29} }}'
+		return super().__repr__().rstrip('} ') + f', unk08: {self.unk08}, part ID: {self.product_num}, unk1E: {self.unk1E}, unk29: {self.unk29} }}'
 
 @dataclass
 class FoconDisplayOutputConfiguration:
@@ -282,24 +283,24 @@ class FoconDisplayDumpType(Enum):
 	TaskStats = 0x06
 
 @dataclass
-class FoconDisplayProductInfo:
-	boot_version: tuple[int, int]
-	num:        int
+class FoconDisplayAssetData:
+	version:    tuple[int, int]
+	part_id:    int
 	name:       str
-	unk1_count: int
-	unk1_value: int
+	font_count: int
+	size:       int
 
 	def pack(self) -> bytes:
 		raise NotImplementedError()
 
 	@classmethod
-	def unpack(cls, data: bytes) -> 'FoconDisplayProductInfo':
+	def unpack(cls, data: bytes) -> 'FoconDisplayAssetData':
 		return cls(
-			boot_version=decode_version(data[0:3]),
-			num=int(decode_str(data[4:14])),
+			version=decode_version(data[0:3]),
+			part_id=int(decode_str(data[4:14])),
 			name=decode_str(data[14:64]),
-			unk1_count=data[64],
-			unk1_value=unpack('>I', data[66:70])[0],
+			font_count=data[64],
+			size=unpack('>I', data[66:70])[0],
 		)
 
 
@@ -318,7 +319,7 @@ class FoconDisplayError(Flag):
 	DisplayDriver = (1 << 6)
 	Power10       = (1 << 7)
 	ConfigBE      = (1 << 8)
-	ProductInfo   = (1 << 9)
+	AssetData     = (1 << 9)
 	Unk10         = (1 << 10)
 	Option1       = (1 << 11)
 	Option2       = (1 << 12)
@@ -763,23 +764,23 @@ class FoconDisplay:
 		return FoconDisplayDrawList.unpack(response)
 
 	# 004F
-	def get_product_info(self) -> FoconDisplayProductInfo:
-		response = self.send_command(FoconDisplayCommand.ProductInfo)
-		return FoconDisplayProductInfo.unpack(response)
+	def get_asset_data(self) -> FoconDisplayAssetData:
+		response = self.send_command(FoconDisplayCommand.GetAssetData)
+		return FoconDisplayAssetData.unpack(response)
 
 	# 0050
 	@dangerous
-	def reset_product_info(self) -> None:
-		self.send_command(FoconDisplayCommand.ResetProductInfo)
+	def reset_asset_data(self) -> None:
+		self.send_command(FoconDisplayCommand.ResetAssetdata)
 
 	# 00F0
 	@dangerous
-	def set_product_info(self, info: FoconDisplayProductInfo) -> None:
-		self.send_command(FoconDisplayCommand.SetProductInfo, info.pack())
+	def set_asset_data(self, data: FoconDisplayAssetData) -> None:
+		self.send_command(FoconDisplayCommand.SetAssetData, data.pack())
 
 	# 00F1
-	def verify_product_info(self) -> None:
-		self.send_command(FoconDisplayCommand.VerifyProductInfo)
+	def verify_asset_data(self) -> None:
+		self.send_command(FoconDisplayCommand.VerifyAssetData)
 
 	# FFF0
 	def parse_dump_response(self, type: FoconDisplayDumpType, response: bytes) -> str:

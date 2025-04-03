@@ -53,9 +53,10 @@ def main() -> None:
         display_subcommands = display_parser.add_subparsers(title='display subcommands', required=True)
 
         def do_display_info(display, args):
-                device_info = display.get_device_info()
+                device_info = display.get_display_info()
                 print('boot:')
                 print('  type:   ', device_info.kind)
+                print('  mode:   ', device_info.mode.name)
                 print('  version: {}.{:02}'.format(*device_info.boot_version))
                 print()
 
@@ -63,10 +64,15 @@ def main() -> None:
                 print('  version: {}.{:02}'.format(*device_info.app_version))
                 print()
 
-                print('product:')
-                product_info = display.get_product_info()
-                print('  part:   ', product_info.num)
-                print('  name:   ', product_info.name)
+                print('assets:')
+                asset_data = display.get_asset_data()
+                print('  part:   ', asset_data.part_id)
+                print('  name:   ', asset_data.name)
+                print('  version: {}.{:02}'.format(*asset_data.version))
+                print('  size:   ', asset_data.size)
+                print('  fonts:')
+                for font_id in range(asset_data.font_count):
+                        print('    - font')
                 print()
 
                 print('stats:')
