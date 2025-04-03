@@ -1,5 +1,11 @@
 import argparse
 import logging
+import time
+try:
+        import PIL.Image
+except ImportError:
+        # Not mandatory
+        PIL = None
 
 from . import FoconFrame, FoconSerialTransport, FoconBus, FoconMessageBus, FoconDisplay
 from .devices.display import *
@@ -229,14 +235,39 @@ def main() -> None:
         print_parser.add_argument('message')
 
         def do_display_draw(display, spec, args):
-                import PIL.Image
                 image = PIL.Image.open(args.file)
-                if image.mode != '1':
-                        image = image.convert('1')
-                values = []
-                for x in range(image.width):
-                        values.append([bool(image.getpixel((x, y))) for y in range(image.height)])
-                print(display.draw(values, image.height, spec))
+                n_frames = getattr(image, 'n_frames', 1)
+                loops = image.info.get('loop', 1)
+
+                n = 0
+                frames = []
+                while loops == 0 or n < loops:
+                        for frame_id in range(n_frames):
+                                image.seek(frame_id)
+                                frame_duration = image.info.get('duration', 0) / 1000
+
+                                if frame_id < len(frames):
+                                        frame = frames[frame_id]
+                                else:
+                                        if image.mode != '1':
+                                                f = image.convert('1')
+                                        else:
+                                                f = image
+                                        frame = []
+                                        for x in range(f.width):
+                                                frame.append([bool(f.getpixel((x, y))) for y in range(f.height)])
+                                        if loops != 1:
+                                                frames.append(frame)
+
+                                start = time.time()
+                                display.draw(values, f.height, spec)
+                                end = time.time()
+
+                                elapsed = end - start
+                                if elapsed < frame_duration:
+                                        time.sleep(frame_duration - elapsed)
+
+                        n += 1
 
         draw_parser = display_subcommands.add_parser('draw')
         add_display_draw_object_args(draw_parser)
