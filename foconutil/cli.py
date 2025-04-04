@@ -44,6 +44,41 @@ def main() -> None:
         info_parser = subcommands.add_parser('info')
         info_parser.set_defaults(_handler=do_info)
 
+        # Bootloader subcommands
+
+        def do_bootloader(args):
+                transport = FoconSerialTransport(args.device, flow_control=args.flow_control, debug=args.debug > 2)
+                bus = FoconBus(transport, args.source_id, debug=args.debug > 1)
+                msg_bus = FoconMessageBus(bus, args.source_id, debug=args.debug > 0)
+                device = FoconDevice(msg_bus, args.id)
+                bootloader = FoconBootDevice(device)
+
+                args._bootloader_handler(bootloader, args)
+        bootloader_parser = subcommands.add_parser('boot')
+        bootloader_parser.set_defaults(_handler=do_bootloader, _bootloader_handler=None)
+        bootloader_subcommands = bootloader_parser.add_subparsers(title='boot loader subcommands', required=True)
+
+        def do_flash_app(bootloader, args):
+                return bootloader.write_app(args.APP.read())
+
+        flash_app_parser = bootloader_subcommands.add_parser('flash')
+        flash_app_parser.add_argument('APP', type=argparse.FileType('rb'))
+        flash_app_parser.set_defaults(_bootloader_handler=do_flash_app)
+
+        def do_flash_block(bootloader, args):
+                return bootloader.write_block(args.ADDRESS, args.DATA.read())
+
+        flash_block_parser = bootloader_subcommands.add_parser('flash-block')
+        flash_block_parser.add_argument('ADDRESS', type=int, help='address to flash')
+        flash_block_parser.add_argument('DATA', type=argparse.FileType('rb'))
+        flash_block_parser.set_defaults(_bootloader_handler=do_flash_block)
+
+        def do_launch(bootloader, args):
+                return bootloader.launch()
+
+        launch_parser = bootloader_subcommands.add_parser('launch')
+        launch_parser.set_defaults(_bootloader_handler=do_launch)
+
         # Display subcommands
 
         def do_display(args):
