@@ -179,6 +179,11 @@ def main() -> None:
         selftest_parser.set_defaults(_display_handler=do_display_selftest)
         selftest_parser.add_argument('type', choices=tuple(SELFTEST_TYPES))
 
+        def do_display_selfdestruct(display, args):
+                print(display.self_destruct())
+        selfdestruct_parser = display_subcommands.add_parser('selfdestruct')
+        selfdestruct_parser.set_defaults(_display_handler=do_display_selfdestruct)
+
         def do_display_status(display, args):
                 print(display.get_status())
         get_status_parser = display_subcommands.add_parser('status')
