@@ -107,6 +107,17 @@ def main() -> None:
                 print('  version: {}.{:02}'.format(*device_info.app_version))
                 print()
 
+                print('display:')
+                if device_info.unk08:
+                        print('  unk08:  ', device_info.unk08)
+                if device_info.part_id:
+                        print('  part:   ', device_info.part_id)
+                if device_info.unk1E:
+                        print('  unk1E:  ', device_info.unk1E)
+                if device_info.unk29:
+                        print('  unk29:  ', device_info.unk29)
+                print()
+
                 print('assets:')
                 asset_data = display.get_asset_data()
                 print('  part:   ', asset_data.part_id)

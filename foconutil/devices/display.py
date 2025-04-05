@@ -71,7 +71,7 @@ class FoconDisplayInfo(FoconDeviceInfo):
 		)
 
 	def __repr__(self) -> str:
-		return super().__repr__().rstrip('} ') + f', unk08: {self.unk08}, part ID: {self.product_num}, unk1E: {self.unk1E}, unk29: {self.unk29} }}'
+		return super().__repr__().rstrip('} ') + f', unk08: {self.unk08}, part ID: {self.part_id}, unk1E: {self.unk1E}, unk29: {self.unk29} }}'
 
 @dataclass
 class FoconDisplayOutputConfiguration:
