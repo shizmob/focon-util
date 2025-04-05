@@ -91,7 +91,7 @@ class FoconBus:
 					continue
 				if peer.frames[-1].is_nak:
 					frame_data = None
-				elif peer.frames[-1].num == peer.seq:
+				elif peer.frames[-1].num == peer.seq or peer.seq == 0:
 					frame_data = b''.join(f.data for f in sorted(peer.frames, key=lambda f: f.num)) or None
 				else:
 					continue
