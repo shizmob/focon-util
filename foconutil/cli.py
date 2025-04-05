@@ -228,8 +228,8 @@ def main() -> None:
                 output_ids = args.output_id or [1]
                 x = args.x or 0
                 y = args.y or 0
-                width = args.width if args.width is not None else (config.x_end + 1)
-                height = args.height if args.height is not None else (config.y_end + 1)
+                width = args.width if args.width is not None else (config.x_end - x + 1)
+                height = args.height if args.height is not None else (config.y_end - y + 1)
                 for output_id in output_ids:
                         spec = FoconDisplayDrawSpec(
                                 object_id=args.object_id,
