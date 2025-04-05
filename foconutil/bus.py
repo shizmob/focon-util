@@ -2,7 +2,6 @@ from typing import Callable, Protocol
 from logging import getLogger
 
 from math import ceil
-from time import sleep
 from serial import Serial
 
 from .frame import FoconFrame
@@ -20,9 +19,8 @@ class FoconTransport(Protocol):
 class FoconSerialTransport(FoconTransport):
 	BAUDRATE = 57600
 
-	def __init__(self, device: str, sleep_after_tx: float | None = 0.0002, flow_control: bool = True, debug=False) -> None:
+	def __init__(self, device: str, flow_control: bool = True, debug=False) -> None:
 		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=flow_control)
-		self.sleep_after_tx = sleep_after_tx
 		self.serial.reset_output_buffer()
 		self.serial.reset_input_buffer()
 		self.debug = debug
@@ -40,8 +38,6 @@ class FoconSerialTransport(FoconTransport):
 		self.serial.setRTS(1)
 		self.serial.write(data)
 		self.serial.flush()
-		if self.sleep_after_tx:
-			sleep(self.sleep_after_tx * len(data))
 		self.serial.setRTS(0)
 
 class FoconPeer:
