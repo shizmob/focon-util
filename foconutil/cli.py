@@ -296,6 +296,7 @@ def main() -> None:
                 frames = []
                 while loops == 0 or n < loops:
                         for frame_id in range(n_frames):
+                                start = time.time()
                                 image.seek(frame_id)
                                 frame_duration = image.info.get('duration', 0) / 1000
 
@@ -312,8 +313,7 @@ def main() -> None:
                                         if loops != 1:
                                                 frames.append(frame)
 
-                                start = time.time()
-                                display.draw(values, f.height, spec)
+                                display.draw(frame, f.height, spec)
                                 end = time.time()
 
                                 elapsed = end - start
