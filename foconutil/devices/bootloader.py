@@ -1,4 +1,6 @@
 from enum import Enum
+from dataclasses import dataclass
+from struct import pack
 
 from .device import FoconDevice, FoconDeviceInfo, dangerous
 
@@ -7,12 +9,13 @@ class FoconBootCommand(Enum):
 	WriteFlash = 0x00F0
 	LaunchApp  = 0x00F1
 
+@dataclass
 class FoconBootFlashBlock:
 	address: int
 	data: bytes
 
 	def pack(self) -> bytes:
-		return pack('>HI', len(self.data), self.address) + data
+		return pack('>HI', len(self.data), self.address) + self.data
 
 class FoconBootDevice:
 	APP_ADDRESS = 0x7000
@@ -33,9 +36,13 @@ class FoconBootDevice:
 
 	@dangerous
 	def write_flash(self, address: int, data: bytes) -> int:
-		block = FoconBootFlashBlock(address=address, data=data)
-		reply = self.send_boot_command(FoconBootCommand.WriteFlash, block.pack())
-		return reply[0]
+		chunk_size = 0x200
+		for off in range(0, len(data), chunk_size):
+			print(hex(off))
+			block = FoconBootFlashBlock(address=address + off, data=data[off:off + chunk_size])
+			status = self.send_boot_command(FoconBootCommand.WriteFlash, block.pack())
+			if not status[0]:
+				raise ValueError('flashing address 0x{:08x} failed!'.format(address + off))
 
 	@dangerous
 	def write_app(self, data: bytes) -> None:

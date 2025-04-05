@@ -8,6 +8,7 @@ except ImportError:
         PIL = None
 
 from . import FoconFrame, FoconSerialTransport, FoconBus, FoconMessageBus, FoconDisplay
+from .devices.bootloader import FoconBootDevice
 from .devices.display import *
 
 
@@ -74,7 +75,8 @@ def main() -> None:
         flash_block_parser.set_defaults(_bootloader_handler=do_flash_block)
 
         def do_launch(bootloader, args):
-                return bootloader.launch()
+                if not bootloader.launch():
+                        return 1
 
         launch_parser = bootloader_subcommands.add_parser('launch')
         launch_parser.set_defaults(_bootloader_handler=do_launch)
