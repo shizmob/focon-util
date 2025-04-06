@@ -131,39 +131,50 @@ class FoconDisplayOutputConfiguration:
 		return self.total_blocks // self.row_blocks
 
 @dataclass
-class FoconDisplayConfigurationUnk6C:
-	data: bytes
+class FoconDisplayAdjustmentEntry:
+	center: int
+	span: int
+	value: int
 
 	def pack(self) -> bytes:
-		return self.data
+		return pack('>HBB', self.center, self.value, self.span)
 
 	@classmethod
-	def unpack(cls, data: bytes) -> 'FoconDisplayConfigurationUnk6C':
-		return cls(data=data)
+	def unused(cls) -> 'FoconDisplayAdjustmentEntry':
+		return cls(center=0, value=0, span=0)
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'FoconDisplayAdjustmentEntry':
+		return cls(
+			center=unpack('>H', data[0:2]),
+			value=data[2],
+			span=data[3],
+		)
 
 MAX_OUTPUTS = 10
+ADJUSTMENT_ENTRIES = 10
 
 @dataclass
 class FoconDisplayConfiguration:
-	param0: int
+	native_word_size: int
 	param1: int
 	led_col_size: int
 	brightness_sensor: bool
-	active_low: bool
+	led_active_low: bool
 	led_delay_us: int
-	hw_loop_delay_ms: int
-	brightness_mess_count:  int
-	temperature_mess_count: int
+	hw_adjust_interval_ms: int
+	hw_adjust_brightness_history_count:  int
+	hw_adjust_temp_history_count: int
 
 	outputs: list[FoconDisplayOutputConfiguration]
+	brightness_adjustments: list[FoconDisplayAdjustmentEntry]
+	temp_adjustments: list[FoconDisplayAdjustmentEntry]
 
-	unk6C: FoconDisplayConfigurationUnk6C
-	unk94: FoconDisplayConfigurationUnk6C
+	hw_adjust_temp_offset: int
+	hw_adjust_temp_enable: bool
 
 	unk00: int
-	watchdog_time: int
-	unkBE: int
-	unkBF: int
+	message_response_timeout: int
 	x_start: int
 	y_start: int
 	x_end: int
@@ -176,8 +187,8 @@ class FoconDisplayConfiguration:
 		b += bytes([
 			self.unk00,
 			1 if self.brightness_sensor else 0,   # param3
-			1 if self.active_low else 0,          # param4
-			self.param0,
+			1 if self.led_active_low else 0,      # param4
+			self.native_word_size,                # param0
 			self.led_col_size,                    # param2
 			self.param1,
 			self.led_delay_us,                    # param6
@@ -189,15 +200,21 @@ class FoconDisplayConfiguration:
 		for _ in range(MAX_OUTPUTS - len(self.outputs)):
 			b += FoconDisplayOutputConfiguration.unused().pack()
 		# 0x6C..0x94
-		b += self.unk6C.pack()
+		for entry in self.brightness_adjustments:
+			b += entry.pack()
+		for _ in range(ADJUSTMENT_ENTRIES - len(self.brightness_adjustments)):
+			b += FoconDisplayAdjustmentEntry.unused().pack()
 		# 0x94..0xBC
-		b += self.unk94.pack()
+		for entry in self.temp_adjustments:
+			b += entry.pack()
+		for _ in range(ADJUSTMENT_ENTRIES - len(self.temp_adjustments)):
+			b += FoconDisplayAdjustmentEntry.unused().pack()
 		# 0xBC..0xBE
-		b += pack('>H', self.watchdog_time)
+		b += pack('>H', self.hw_adjust_temp_offset)
 		# 0xBE..0xC2
 		b += bytes([
-			self.unkBE,
-			self.unkBF,
+			1 if self.hw_adjust_temp_enable else 0,
+			self.message_response_timeout,
 			self.x_start,
 			self.y_start,
 		])
@@ -207,9 +224,9 @@ class FoconDisplayConfiguration:
 		b += pack('>H', self.y_end)
 		# 0xC6..0xC9
 		b += bytes([
-			self.hw_loop_delay_ms,       # param7
-			self.brightness_mess_count,  # param8
-			self.temperature_mess_count, # param9
+			self.hw_adjust_interval_ms,  # param7
+			self.hw_adjust_brightness_history_count,  # param8
+			self.hw_adjust_temp_history_count, # param9
 		])
 
 		return b
@@ -217,32 +234,38 @@ class FoconDisplayConfiguration:
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayConfiguration':
 		return cls(
-			param0=data[0x03],
+			native_word_size=data[0x03],
 			param1=data[0x05],
 			led_col_size=data[0x04], # param2
 			brightness_sensor=bool(data[0x01]), # param3
-			active_low=bool(data[0x02]), # param4
+			led_active_low=bool(data[0x02]), # param4
 			led_delay_us=data[0x06], # param6
-			hw_loop_delay_ms=data[0xC6], # param7
-			brightness_mess_count=data[0xC7], # param8
-			temperature_mess_count=data[0xC8], # param9
+			hw_adjust_interval_ms=data[0xC6], # param7
+			hw_adjust_brightness_history_count=data[0xC7], # param8
+			hw_adjust_temp_history_count=data[0xC8], # param9
 
 			outputs=[
 				FoconDisplayOutputConfiguration.unpack(data[8 + i * 10:8 + i * 10 + 10])
 				for i in range(data[7])
 			],
+			brightness_adjustments=[
+				FoconDisplayAdjustmentEntry.unpack(data[0x6C + i * 4:0x6C + i * 4 + 4])
+				for i in range(MAX_OUTPUTS),
+			],
+			temp_adjustments=[
+				FoconDisplayAdjustmentEntry.unpack(data[0x94 + i * 4:0x94 + i * 4 + 4])
+				for i in range(MAX_OUTPUTS),
+			],
 
-			unk6C=FoconDisplayConfigurationUnk6C.unpack(data[0x6C:0x94]),
-			unk94=FoconDisplayConfigurationUnk6C.unpack(data[0x94:0xBC]),
-
-			unk00=data[0],
-			watchdog_time=unpack('>H', data[0xBC:0xBE])[0],
-			unkBE=data[0xBE],
-			unkBF=data[0xBF],
+			hw_adjust_temp_offset=unpack('>H', data[0xBC:0xBE])[0],
+			hw_adjust_temp_enable=bool(data[0xBE]),
+			message_response_timeout=data[0xBF],
 			x_start=data[0xC0],
 			y_start=data[0xC1],
 			x_end=unpack('>H', data[0xC2:0xC4])[0],
 			y_end=unpack('>H', data[0xC4:0xC6])[0],
+
+			unk00=data[0],
 		)
 
 	@property
@@ -331,15 +354,15 @@ class FoconDisplayStatus:
 	error_flags:              FoconDisplayError
 	temperature:              float
 	mode:                     int
-	brightness_average:       int | None
-	unk1_3:                   int
-	hw_ipc_val_3:             int
-	hw_ipc_val_res:           int
-	sensor4_value:            int
+	general_adjust:           int
+	brightness_adjust:        int
+	temp_adjust:              int
+	overall_adjust:           int
+	power10_value:            int
 	available_still_objects:  int
 	available_scroll_objects: int
-	unk2a:                    bytes | None
-	unk2b:                    bytes | None
+	unk1_object_ids:          List[int]
+	unk2_object_ids:          List[int]
 
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayStatus':
@@ -347,15 +370,15 @@ class FoconDisplayStatus:
 			error_flags=FoconDisplayError(unpack('>H', data[0:2])[0]),
 			temperature=unpack('>H', data[2:4])[0] / 10,
 			mode=data[4], # status0
-			sensor4_value=data[5], # status6
-			brightness_average=data[6] if bool(data[10]) else None, # status2, status1
-			hw_ipc_val_3=data[7], # status4
-			unk1_3=data[8],
-			hw_ipc_val_res=data[9], # status5
+			power10_value=data[5], # status6
+			brightness_adjust=data[6] if bool(data[10]) else None, # status2, status1
+			general_adjust=data[7], # status4
+			temp_adjust=data[8], # status3
+			overall_adjust=data[9], # status5
 			available_still_objects=data[11], # status7
 			available_scroll_objects=data[12], # status8
-			unk2a=data[15:38] if bool(data[14]) else None,
-			unk2b=data[39:62] if bool(data[38]) else None,
+			unk1_object_ids=[data[14 + i] for i in range(data[13])],
+			unk2_object_ids=[data[38 + i] for i in range(data[37])],
 		)
 
 class FoconDisplayDrawComposition(Enum):
