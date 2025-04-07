@@ -73,16 +73,22 @@ class FoconDisplayInfo(FoconDeviceInfo):
 	def __repr__(self) -> str:
 		return super().__repr__().rstrip('} ') + f', unk08: {self.unk08}, part ID: {self.part_id}, unk1E: {self.unk1E}, unk29: {self.unk29} }}'
 
+class FoconDisplayOutputLayout(Enum):
+	ByteLSB = 0
+	ByteMSB = 1
+	WordLSB = 2
+	WordMSB = 3
+
 @dataclass
 class FoconDisplayOutputConfiguration:
-	unk00: int
-	unk01: int
+	index: int
+	layout: FoconDisplayOutputLayout
 	row_num: int
 	col_num: int
-	axes_flipped: bool
+	row_major: bool
 	unk05: int
 	row_blocks: int
-	unk07: int
+	pwm_cycle: int
 	total_blocks: int
 
 	def pack(self) -> bytes:
@@ -90,14 +96,14 @@ class FoconDisplayOutputConfiguration:
 
 		# 0x00..0x08
 		b += bytes([
-			self.unk00,
-			self.unk01,
+			self.index,
+			self.layout.value,
 			self.row_num,
 			self.col_num,
-			1 if self.axes_flipped else 0,
-			self.unk05,
+			1 if self.row_major else 0,
+			1 if self.unk05 else 0,
 			self.row_blocks,
-			self.unk07,
+			self.pwm_cycle,
 		])
 		# 0x08..0x0A
 		b += pack('>H', self.total_blocks)
@@ -107,22 +113,22 @@ class FoconDisplayOutputConfiguration:
 	@classmethod
 	def unused(cls) -> 'FoconDisplayOutputConfiguration':
 		return cls(
-			unk00=0, unk01=0,
-			row_num=0, col_num=0, axes_flipped=False,
-			unk05=0, row_blocks=0, unk07=0, total_blocks=0,
+			index=0, bit_layout=FoconDisplayOutputLayout.ByteLSB,
+			row_num=0, col_num=0, row_major=False,
+			unk05=False, row_blocks=0, pwm_cycle=0, total_blocks=0,
 		)
 
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayOutputConfiguration':
 		return cls(
-			unk00=data[0],
-			unk01=data[1],
+			index=data[0],
+			layout=FoconDisplayOutputLayout(data[1]),
 			row_num=data[2],
 			col_num=data[3],
-			axes_flipped=bool(data[4]),
-			unk05=data[5],
+			row_major=bool(data[4]),
+			unk05=bool(data[5]),
 			row_blocks=data[6],
-			unk07=data[7],
+			pwm_cycle=data[7],
 			total_blocks=unpack('>H', data[8:10])[0],
 		)
 
@@ -146,7 +152,7 @@ class FoconDisplayAdjustmentEntry:
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayAdjustmentEntry':
 		return cls(
-			center=unpack('>H', data[0:2]),
+			center=unpack('>H', data[0:2])[0],
 			value=data[2],
 			span=data[3],
 		)
@@ -156,25 +162,25 @@ ADJUSTMENT_ENTRIES = 10
 
 @dataclass
 class FoconDisplayConfiguration:
-	native_word_size: int
-	param1: int
-	led_col_size: int
-	brightness_sensor: bool
-	led_active_low: bool
-	led_delay_us: int
-	hw_adjust_interval_ms: int
-	hw_adjust_brightness_history_count:  int
-	hw_adjust_temp_history_count: int
+	led_unk1: int       # param 0
+	led_unk2: bool      # param 1
+	led_col_size: int   # param 2
+	led_pwm_auto: bool  # param 4
+	led_pwm_cycle: int  # param 6
+
+	hw_adjust_interval_ms: int                  # param 7
+	hw_adjust_brightness_history_count:  int    # param 8
+	hw_adjust_brightness_enable: bool           # param 3
+	hw_adjust_temp_history_count: int           # param 9
+	hw_adjust_temp_offset: int
+	hw_adjust_temp_enable: bool
 
 	outputs: list[FoconDisplayOutputConfiguration]
 	brightness_adjustments: list[FoconDisplayAdjustmentEntry]
 	temp_adjustments: list[FoconDisplayAdjustmentEntry]
 
-	hw_adjust_temp_offset: int
-	hw_adjust_temp_enable: bool
-
 	unk00: int
-	message_response_timeout: int
+	message_response_timeout_10s: int
 	x_start: int
 	y_start: int
 	x_end: int
@@ -186,12 +192,12 @@ class FoconDisplayConfiguration:
 		# 0x00..0x07
 		b += bytes([
 			self.unk00,
-			1 if self.brightness_sensor else 0,   # param3
-			1 if self.led_active_low else 0,      # param4
-			self.native_word_size,                # param0
+			1 if self.hw_adjust_brightness_enable else 0,   # param3
+			1 if self.led_pwm_auto else 0,        # param4
+			self.led_unk1,                        # param0
 			self.led_col_size,                    # param2
-			self.param1,
-			self.led_delay_us,                    # param6
+			1 if self.led_unk2 else 0,            # param1
+			self.led_pwm_cycle,                   # param6
 			len(self.outputs),
 		])
 		# 0x08..0x06C
@@ -214,7 +220,7 @@ class FoconDisplayConfiguration:
 		# 0xBE..0xC2
 		b += bytes([
 			1 if self.hw_adjust_temp_enable else 0,
-			self.message_response_timeout,
+			self.message_response_timeout_10s,
 			self.x_start,
 			self.y_start,
 		])
@@ -234,12 +240,12 @@ class FoconDisplayConfiguration:
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayConfiguration':
 		return cls(
-			native_word_size=data[0x03],
-			param1=data[0x05],
+			led_unk1=data[0x03], # param0
+			led_unk2=bool(data[0x05]), # param1
 			led_col_size=data[0x04], # param2
-			brightness_sensor=bool(data[0x01]), # param3
-			led_active_low=bool(data[0x02]), # param4
-			led_delay_us=data[0x06], # param6
+			hw_adjust_brightness_enable=bool(data[0x01]), # param3
+			led_pwm_auto=bool(data[0x02]), # param4
+			led_pwm_cycle=data[0x06], # param6
 			hw_adjust_interval_ms=data[0xC6], # param7
 			hw_adjust_brightness_history_count=data[0xC7], # param8
 			hw_adjust_temp_history_count=data[0xC8], # param9
@@ -250,16 +256,16 @@ class FoconDisplayConfiguration:
 			],
 			brightness_adjustments=[
 				FoconDisplayAdjustmentEntry.unpack(data[0x6C + i * 4:0x6C + i * 4 + 4])
-				for i in range(MAX_OUTPUTS),
+				for i in range(ADJUSTMENT_ENTRIES)
 			],
 			temp_adjustments=[
 				FoconDisplayAdjustmentEntry.unpack(data[0x94 + i * 4:0x94 + i * 4 + 4])
-				for i in range(MAX_OUTPUTS),
+				for i in range(ADJUSTMENT_ENTRIES)
 			],
 
 			hw_adjust_temp_offset=unpack('>H', data[0xBC:0xBE])[0],
 			hw_adjust_temp_enable=bool(data[0xBE]),
-			message_response_timeout=data[0xBF],
+			message_response_timeout_10s=data[0xBF],
 			x_start=data[0xC0],
 			y_start=data[0xC1],
 			x_end=unpack('>H', data[0xC2:0xC4])[0],
@@ -398,7 +404,7 @@ COMPOSITION_NAMES = {
 	'remove': FoconDisplayDrawComposition.Remove,
 }
 
-class FoconDisplayDrawEffect(Enum):
+class FoconDisplayDrawTransition(Enum):
 	UnkU = 'U'
 	UnkD = 'D'
 	LeftScroll = 'L'
@@ -408,17 +414,17 @@ class FoconDisplayDrawEffect(Enum):
 	Blink = 'V'
 
 	@classmethod
-	def parse(cls, s: str) -> 'FoconDisplayDrawEffect':
-		return EFFECT_NAMES[s]
+	def parse(cls, s: str) -> 'FoconDisplayDrawTransition':
+		return TRANSITION_NAMES[s]
 
-EFFECT_NAMES = {
-	'scroll': FoconDisplayDrawEffect.LeftScroll,
-	'left-scroll': FoconDisplayDrawEffect.LeftScroll,
-	'right-scroll': FoconDisplayDrawEffect.RightScroll,
-	'appear': FoconDisplayDrawEffect.Appear,
-	'none': FoconDisplayDrawEffect.Appear,
-	'disappear': FoconDisplayDrawEffect.Disappear,
-	'blink': FoconDisplayDrawEffect.Blink,
+TRANSITION_NAMES = {
+	'scroll': FoconDisplayDrawTransition.LeftScroll,
+	'left-scroll': FoconDisplayDrawTransition.LeftScroll,
+	'right-scroll': FoconDisplayDrawTransition.RightScroll,
+	'appear': FoconDisplayDrawTransition.Appear,
+	'none': FoconDisplayDrawTransition.Appear,
+	'disappear': FoconDisplayDrawTransition.Disappear,
+	'blink': FoconDisplayDrawTransition.Blink,
 }
 
 
@@ -529,23 +535,23 @@ class FoconDisplayUndrawSpecification:
 
 @dataclass
 class FoconDisplayDrawSpec:
-	object_id:   int
-	output_id:   int
-	unk0E:       int
-	unk0F:       int
-	composition: FoconDisplayDrawComposition
-	x_end:       int
-	y_end:       int
-	x_start:     int = 0
-	y_start:     int = 0
-	effect:      FoconDisplayDrawEffect = FoconDisplayDrawEffect.Appear
-	count:       int = 1
-	duration:    int = 1
+	object_id:     int
+	output_id:     int
+	composition:   FoconDisplayDrawComposition
+	x_end:         int
+	y_end:         int
+	x_start:       int = 0
+	y_start:       int = 0
+	transition:    FoconDisplayDrawTransition = FoconDisplayDrawTransition.Appear
+	count:         int = 1
+	duration:      int = 10
+	duration_duty: int = 50
+	pwm_cycle:     int = 0
 
 	def pack(self) -> bytes:
 		return (bytes([self.object_id, ord(self.composition.value)]) +
 		        pack('>HHHH', self.x_start, self.y_start, self.x_end, self.y_end) +
-		        bytes([ord(self.effect.value), self.count, self.output_id, self.duration, self.unk0E, self.unk0F]))
+		        bytes([ord(self.transition.value), self.count, self.output_id, self.duration, self.duration_duty, self.pwm_cycle]))
 
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayDrawSpec':
@@ -557,12 +563,12 @@ class FoconDisplayDrawSpec:
 			y_start=y_start,
 			x_end=x_end,
 			y_end=y_end,
-			effect=FoconDisplayDrawEffect(chr(data[10])),
+			transition=FoconDisplayDrawTransition(chr(data[10])),
 			count=data[11],
 			output_id=data[12],
 			duration=data[13],
-			unk0E=data[14],
-			unk0F=data[15],
+			duration_duty=data[14],
+			pwm_cycle=data[15],
 		)
 
 @dataclass
@@ -782,7 +788,7 @@ class FoconDisplay:
 	# 004D
 	def redraw(self, object_ids: List[int], composition: FoconDisplayDrawComposition = None) -> FoconDisplayDrawList:
 		spec = FoconDisplayRedrawSpecification(
-			composition=composition or FoconDisplayDrawEffect.Appear,
+			composition=composition or FoconDisplayDrawTransition.Appear,
 			objects=FoconDisplayDrawList(object_ids),
 		)
 		response = self.send_command(FoconDisplayCommand.Redraw, spec.pack())
