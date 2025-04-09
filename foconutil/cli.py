@@ -218,7 +218,7 @@ def main() -> None:
 	def add_display_draw_args(parser):
 		parser.add_argument('-c', '--config', type=argparse.FileType('a+b'), help='path to file containing display configuration to use (will be written if specified but empty or invalid)')
 		parser.add_argument('-C', '--composition', type=FoconDisplayDrawComposition.parse) #choices=list(COMPOSITION_NAMES))
-		parser.add_argument('-t', '--transition', type=FoconDisplayDrawTransition.parse) #, choices=list(EFFECT_NAMES))
+		parser.add_argument('-T', '--transition', type=FoconDisplayDrawTransition.parse) #, choices=list(EFFECT_NAMES))
 		parser.set_defaults(_display_handler=do_display_draw_base, _display_draw_handler=None)
 
 	def do_display_draw_object(display, args):
