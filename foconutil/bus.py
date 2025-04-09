@@ -26,7 +26,8 @@ class FoconSerialTransport(FoconTransport):
 		self.debug = debug
 
 	def read(self) -> bytes:
-		self.serial.setRTS(0)
+		if self.serial.rtscts:
+			self.serial.setRTS(0)
 		data: bytes = self.serial.read()
 		if self.debug:
 			LOG.debug('  <: %s', data.hex())
@@ -35,10 +36,12 @@ class FoconSerialTransport(FoconTransport):
 	def write(self, data: bytes) -> None:
 		if self.debug:
 			LOG.debug('  >: %s', data.hex())
-		self.serial.setRTS(1)
+		if self.serial.rtscts:
+			self.serial.setRTS(1)
 		self.serial.write(data)
 		self.serial.flush()
-		self.serial.setRTS(0)
+		if self.serial.rtscts:
+			self.serial.setRTS(0)
 
 class FoconPeer:
 	def __init__(self):

@@ -15,7 +15,7 @@ from .devices.display import *
 def main() -> None:
 	p = argparse.ArgumentParser()
 	p.add_argument('-d', '--device', default='/dev/ttyUSB0', help='bus device')
-	p.add_argument('--no-flow-control', action='store_false', dest='flow_control', default=True, help='disable hardware flow control')
+	p.add_argument('--flow-control', action='store_true', default=False, help='enable hardware flow control')
 	p.add_argument('-D', '--debug', action='count', default=0, help='debug log')
 	p.add_argument('-s', '--source-id', type=int, default=14, help='source device ID')
 	p.add_argument('-i', '--id', type=int, default=0, help='device ID')
