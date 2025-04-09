@@ -291,6 +291,7 @@ def main() -> None:
 		loops = image.info.get('loop', 1)
 
 		n = 0
+		epoch = time.time()
 		frames = []
 		while loops == 0 or n < loops:
 			for frame_id in range(n_frames):
@@ -317,6 +318,8 @@ def main() -> None:
 				elapsed = end - start
 				if elapsed < frame_duration:
 					time.sleep(frame_duration - elapsed)
+				if frame_id > 0:
+					print('\rFPS: {:4.2f}'.format((n * n_frames + frame_id + 1)  / (end - epoch)), end='')
 
 			n += 1
 
