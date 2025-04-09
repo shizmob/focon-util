@@ -39,7 +39,6 @@ class FoconSerialTransport(FoconTransport):
 		if self.serial.rtscts:
 			self.serial.setRTS(1)
 		self.serial.write(data)
-		self.serial.flush()
 		if self.serial.rtscts:
 			self.serial.setRTS(0)
 
