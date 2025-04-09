@@ -3,12 +3,13 @@ from logging import getLogger
 
 from struct import pack
 from dataclasses import dataclass
-import crc
+import crcmod
 
 from .util import take, take_unpack
 
 LOG = getLogger(__name__)
 
+CRC = crcmod.mkCrcFun(0x18005, 0xffff, False)
 
 @dataclass
 class FoconFrame:
@@ -17,14 +18,6 @@ class FoconFrame:
 	ID_MAP: ClassVar[dict[int | None, bytes]] = {i: bytes([x]) for i, x in enumerate(b'IJKLMNOpqrstuvwx')}
 	ID_MAP[None] = b'*'
 	REVERSE_ID_MAP = {v: k for k, v in ID_MAP.items()}
-	CRC = crc.Configuration(
-		width=16,
-		polynomial=0x8005,
-		init_value=0xFFFF,
-		final_xor_value=0x0000,
-		reverse_input=False,
-		reverse_output=False,
-	)
 
 	src_id:  int
 	dest_id: int | None
@@ -43,7 +36,7 @@ class FoconFrame:
 		cdata = pack('>ccBB', src, dest, self.total, self.num)
 		cdata += pack('>H', len(self.data)) + self.data
 
-		checksum = crc.Calculator(self.CRC).checksum(cdata)
+		checksum = CRC(cdata)
 		data = self.PREAMBLE + cdata + pack('>H', checksum) + self.POSTAMBLE
 		return data
 
@@ -70,7 +63,7 @@ class FoconFrame:
 
 		pdata, data = take(data, pdata_length)
 		cdata = cdata[:-len(data)]
-		expected_checksum = crc.Calculator(cls.CRC).checksum(cdata)
+		expected_checksum = CRC(cdata)
 
 		(checksum,), data = take_unpack(data, '>H')
 		if checksum != expected_checksum:
