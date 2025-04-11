@@ -62,14 +62,16 @@ def main() -> None:
 	bootloader_subcommands = bootloader_parser.add_subparsers(title='boot loader subcommands', required=True)
 
 	def do_flash_app(bootloader, args):
-		return bootloader.write_app(args.APP.read())
+		for offset in bootloader.write_app(args.APP.read()):
+			print('Flashing: {:08x}...'.format(offset))
 
 	flash_app_parser = bootloader_subcommands.add_parser('flash')
 	flash_app_parser.add_argument('APP', type=argparse.FileType('rb'))
 	flash_app_parser.set_defaults(_bootloader_handler=do_flash_app)
 
 	def do_flash_block(bootloader, args):
-		return bootloader.write_block(args.ADDRESS, args.DATA.read())
+		for offset in bootloader.write_flash(args.ADDRESS, args.DATA.read()):
+			print('Flashing: {:08x}...'.format(offset))
 
 	flash_block_parser = bootloader_subcommands.add_parser('flash-block')
 	flash_block_parser.add_argument('ADDRESS', type=int, help='address to flash')

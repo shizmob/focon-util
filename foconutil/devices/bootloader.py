@@ -35,10 +35,10 @@ class FoconBootDevice:
 		return reply[0] == 1
 
 	@dangerous
-	def write_flash(self, address: int, data: bytes) -> int:
+	def write_flash(self, address: int, data: bytes) -> None:
 		chunk_size = 0x200
 		for off in range(0, len(data), chunk_size):
-			print(hex(off))
+			yield off
 			block = FoconBootFlashBlock(address=address + off, data=data[off:off + chunk_size])
 			status = self.send_boot_command(FoconBootCommand.WriteFlash, block.pack())
 			if not status[0]:
