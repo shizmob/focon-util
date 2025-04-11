@@ -220,9 +220,9 @@ def main() -> None:
 		return args._display_draw_handler(display, args)
 
 	def add_display_draw_args(parser):
-		parser.add_argument('-c', '--config', type=argparse.FileType('a+b'), help='path to file containing display configuration to use (will be written if specified but empty or invalid)')
-		parser.add_argument('-C', '--composition', type=FoconDisplayDrawComposition.parse) #choices=list(COMPOSITION_NAMES))
-		parser.add_argument('-T', '--transition', type=FoconDisplayDrawTransition.parse) #, choices=list(EFFECT_NAMES))
+		parser.add_argument('-c', '--config', type=argparse.FileType('a+b'), metavar='FILE', help='path to file containing display configuration to use (will be written if specified but empty or invalid)')
+		parser.add_argument('-C', '--composition', type=FoconDisplayDrawComposition.parse, help='layer composition for drawing object') #choices=list(COMPOSITION_NAMES))
+		parser.add_argument('-T', '--transition', type=FoconDisplayDrawTransition.parse, help='effect for drawing object') #, choices=list(EFFECT_NAMES))
 		parser.set_defaults(_display_handler=do_display_draw_base, _display_draw_handler=None)
 
 	def do_display_draw_object(display, args):
@@ -278,10 +278,10 @@ def main() -> None:
 
 	def add_display_draw_object_args(parser):
 		add_display_draw_args(parser)
-		parser.add_argument('-n', '--count', type=int)
-		parser.add_argument('-t', '--duration', type=int)
-		parser.add_argument('-i', '--object-id', type=int, default=0xFF, help='object ID')
-		parser.add_argument('-o', '--output-id', action='append', type=int, help='output ID(s)')
+		parser.add_argument('-n', '--count', type=int, metavar='N', help='repetitions of object effect')
+		parser.add_argument('-t', '--duration', type=int, metavar='TIME', help='time to display object for')
+		parser.add_argument('-i', '--object-id', type=int, default=0xFF, metavar='ID', help='object ID')
+		parser.add_argument('-o', '--output-id', action='append', type=int, metavar='ID', help='output ID(s)')
 		parser.add_argument('-x', '--x', type=int, help='X position')
 		parser.add_argument('-W', '--width', type=int, help='X size')
 		parser.add_argument('-y', '--y', type=int, help='Y position')
@@ -306,7 +306,7 @@ def main() -> None:
 	add_display_draw_object_args(print_parser)
 	print_parser.set_defaults(_display_draw_object_handler=do_display_print)
 	print_parser.add_argument('-a', '--alignment', type=parse_alignment, help='text alignment')
-	print_parser.add_argument('-s', '--font-size', type=int, help='text size')
+	print_parser.add_argument('-s', '--font-size', type=int, metavar='SIZE', help='text size')
 	print_parser.add_argument('message')
 
 	def do_display_draw(display, spec, args):
