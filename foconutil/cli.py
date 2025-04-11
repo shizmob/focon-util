@@ -15,6 +15,8 @@ from .devices.display import *
 def main() -> None:
 	p = argparse.ArgumentParser()
 	p.add_argument('-d', '--device', default='/dev/ttyUSB0', help='bus device')
+	p.add_argument('-b', '--baudrate', type=int, help='bus baud rate')
+	p.add_argument('-x', '--crystal', type=float, help='crystal oscillator frequency')
 	p.add_argument('--flow-control', action='store_true', default=False, help='enable hardware flow control')
 	p.add_argument('-D', '--debug', action='count', default=0, help='debug log')
 	p.add_argument('-s', '--source-id', type=int, default=14, help='source device ID')
@@ -27,7 +29,7 @@ def main() -> None:
 	# General subcommands
 
 	def do_info(args):
-		transport = FoconSerialTransport(args.device, flow_control=args.flow_control, debug=args.debug > 2)
+		transport = FoconSerialTransport(args.device, baudrate=args.baudrate, xtal=args.crystal, flow_control=args.flow_control, debug=args.debug > 2)
 		bus = FoconBus(transport, args.source_id, debug=args.debug > 1)
 		msg_bus = FoconMessageBus(bus, args.source_id, debug=args.debug > 0)
 		device = FoconDevice(msg_bus, args.id)
@@ -48,7 +50,7 @@ def main() -> None:
 	# Bootloader subcommands
 
 	def do_bootloader(args):
-		transport = FoconSerialTransport(args.device, flow_control=args.flow_control, debug=args.debug > 2)
+		transport = FoconSerialTransport(args.device, baudrate=args.baudrate, xtal=args.crystal, flow_control=args.flow_control, debug=args.debug > 2)
 		bus = FoconBus(transport, args.source_id, debug=args.debug > 1)
 		msg_bus = FoconMessageBus(bus, args.source_id, debug=args.debug > 0)
 		device = FoconDevice(msg_bus, args.id)
@@ -84,7 +86,7 @@ def main() -> None:
 	# Display subcommands
 
 	def do_display(args):
-		transport = FoconSerialTransport(args.device, flow_control=args.flow_control, debug=args.debug > 2)
+		transport = FoconSerialTransport(args.device, baudrate=args.baudrate, xtal=args.crystal, flow_control=args.flow_control, debug=args.debug > 2)
 		bus = FoconBus(transport, args.source_id, debug=args.debug > 1)
 		msg_bus = FoconMessageBus(bus, args.source_id, debug=args.debug > 0)
 		device = FoconDevice(msg_bus, args.id)
@@ -317,9 +319,12 @@ def main() -> None:
 
 				elapsed = end - start
 				if elapsed < frame_duration:
-					time.sleep(frame_duration - elapsed)
+					time.sleep((frame_duration - elapsed) / 2)
 				if frame_id > 0:
-					print('\rFPS: {:4.2f}'.format((n * n_frames + frame_id + 1)  / (end - epoch)), end='')
+					print('\rFPS: {:4.2f}, data rate: {:.2f} b/s'.format(
+						(n * n_frames + frame_id + 1)  / (end - epoch),
+						8 * display.device.bus.bus.transport.n / (end - epoch),
+					), end='')
 
 			n += 1
 

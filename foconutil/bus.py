@@ -18,17 +18,26 @@ class FoconTransport(Protocol):
 
 class FoconSerialTransport(FoconTransport):
 	BAUDRATE = 57600
+	XTAL = 1.8432
 
-	def __init__(self, device: str, flow_control: bool = True, debug=False) -> None:
-		self.serial = Serial(device, baudrate=self.BAUDRATE, rtscts=flow_control)
+	def __init__(self, device: str, flow_control: bool = False, baudrate: int | None = None, xtal: float | None = None, debug=False) -> None:
+		if baudrate is None:
+			baudrate = self.BAUDRATE
+		if xtal is not None:
+			baudrate = int(baudrate * (xtal / self.XTAL))
+		LOG.debug('connecting at baud rate: %s', baudrate)
+
+		self.serial = Serial(device, baudrate=baudrate, rtscts=flow_control)
 		self.serial.reset_output_buffer()
 		self.serial.reset_input_buffer()
 		self.debug = debug
+		self.n = 0
 
 	def read(self) -> bytes:
 		if self.serial.rtscts:
 			self.serial.setRTS(0)
 		data: bytes = self.serial.read()
+		self.n += len(data)
 		if self.debug:
 			LOG.debug('  <: %s', data.hex())
 		return data
@@ -39,6 +48,7 @@ class FoconSerialTransport(FoconTransport):
 		if self.serial.rtscts:
 			self.serial.setRTS(1)
 		self.serial.write(data)
+		self.n += len(data)
 		if self.serial.rtscts:
 			self.serial.setRTS(0)
 
@@ -129,8 +139,8 @@ class FoconBus:
 				return frame
 			except EOFError:
 				return None
-			except:
-				LOG.warn('Error parsing frame data %s, discarding', self.pending_data.hex())
+			except Exception as e:
+				LOG.warn('Error parsing frame data %s, discarding: %s', self.pending_data.hex(), e)
 				self.pending_data = b''
 				return None
 
