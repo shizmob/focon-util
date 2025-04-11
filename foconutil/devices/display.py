@@ -681,7 +681,8 @@ class FoconDisplay:
 	# 0042
 	@dangerous
 	def self_destruct(self) -> None:
-		self.send_command(FoconDisplayCommand.SelfDestruct)
+		r = self.send_command(FoconDisplayCommand.SelfDestruct)
+		assert r == b''
 
 	# 0043
 	def get_status(self) -> FoconDisplayStatus:
