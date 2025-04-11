@@ -300,12 +300,13 @@ def main() -> None:
 	clear_parser.add_argument('OUTPUT', nargs='*')
 
 	def do_display_print(display, spec, args):
-		print(display.print(args.message, spec=spec, alignment=args.alignment))
+		print(display.print(args.message, spec=spec, font_size=args.font_size, alignment=args.alignment))
 
 	print_parser = display_subcommands.add_parser('print')
 	add_display_draw_object_args(print_parser)
 	print_parser.set_defaults(_display_draw_object_handler=do_display_print)
 	print_parser.add_argument('-a', '--alignment', type=parse_alignment, help='text alignment')
+	print_parser.add_argument('-s', '--font-size', type=int, help='text size')
 	print_parser.add_argument('message')
 
 	def do_display_draw(display, spec, args):

@@ -800,8 +800,8 @@ class FoconDisplay:
 		return self.draw(values, height, spec)
 
 	# 004A
-	def print(self, message: str, spec: FoconDisplayDrawSpec, alignment: FoconDisplayAlignment | None = None) -> FoconDisplayDrawStatus:
-		obj = FoconDisplayTextObject(spec, message, alignment=alignment or FoconDisplayAlignment())
+	def print(self, message: str, spec: FoconDisplayDrawSpec, alignment: FoconDisplayAlignment | None = None, font_size: int | None = None) -> FoconDisplayDrawStatus:
+		obj = FoconDisplayTextObject(spec, message, alignment=alignment or FoconDisplayAlignment(), font_size=font_size or 16)
 		response = self.send_command(FoconDisplayCommand.DrawString, obj.pack())
 		return FoconDisplayDrawStatus.unpack(response)
 
