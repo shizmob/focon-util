@@ -113,7 +113,7 @@ class FoconDisplayOutputConfiguration:
 	@classmethod
 	def unused(cls) -> 'FoconDisplayOutputConfiguration':
 		return cls(
-			index=0, bit_layout=FoconDisplayOutputLayout.ByteLSB,
+			index=0, layout=FoconDisplayOutputLayout.ByteLSB,
 			row_num=0, col_num=0, row_major=False,
 			unk05=False, row_blocks=0, pwm_cycle=0, total_blocks=0,
 		)
