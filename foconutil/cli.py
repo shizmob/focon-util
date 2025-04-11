@@ -230,8 +230,8 @@ def main() -> None:
 
 		# build object spec
 		output_ids = args.output_id or [1]
-		x = args.x or 0
-		y = args.y or 0
+		x = args.x if args.x is not None else or config.x_start
+		y = args.y if args.y is not None else config.y_start
 		width = args.width if args.width is not None else (config.x_end - x + 1)
 		height = args.height if args.height is not None else (config.y_end - y + 1)
 		for output_id in output_ids:
