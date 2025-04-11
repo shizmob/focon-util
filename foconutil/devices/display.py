@@ -73,6 +73,36 @@ class FoconDisplayInfo(FoconDeviceInfo):
 	def __repr__(self) -> str:
 		return super().__repr__().rstrip('} ') + f', unk08: {self.unk08}, part ID: {self.part_id}, unk1E: {self.unk1E}, unk29: {self.unk29} }}'
 
+class FoconDisplayHorizontalAlignment(Enum):
+	Left   = 'left'
+	Center = 'center'
+	Right  = 'right'
+
+class FoconDisplayVerticalAlignment(Enum):
+	Top    = 'top'
+	Center = 'center'
+	Bottom = 'bottom'
+
+@dataclass(frozen=True)
+class FoconDisplayAlignment:
+	horizontal: FoconDisplayHorizontalAlignment = FoconDisplayHorizontalAlignment.Center
+	vertical:   FoconDisplayVerticalAlignment = FoconDisplayVerticalAlignment.Center
+
+	def pack(self) -> bytes:
+		hl = list(FoconDisplayHorizontalAlignment)
+		vl = list(FoconDisplayVerticalAlignment)
+		h_index = hl.index(self.horizontal)
+		v_index = vl.index(self.vertical)
+		return bytes([h_index * len(vl) + v_index])
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'Self':
+		hl = list(FoconDisplayHorizontalAlignment)
+		vl = list(FoconDisplayVerticalAlignment)
+		h_index = data[0] // len(vl)
+		v_index = data[0] % len(vl)
+		return cls(horizontal=hl[h_index], vertical=vl[v_index])
+
 class FoconDisplayOutputLayout(Enum):
 	ByteLSB = 0
 	ByteMSB = 1
@@ -576,14 +606,12 @@ class FoconDisplayTextObject:
 	spec: FoconDisplayDrawSpec
 	text: str
 	font_size: int = 16
-	flags: int = 4
+	alignment: FoconDisplayAlignment = FoconDisplayAlignment()
 
 	def pack(self) -> bytes:
 		b = self.spec.pack()
-		b += bytes([
-			self.flags,
-			self.font_size
-		])
+		b += self.alignment.pack()
+		b += bytes([self.font_size])
 		b += self.text.encode(Focon850.NAME) + b'\x00'
 		return b
 
@@ -591,7 +619,7 @@ class FoconDisplayTextObject:
 	def unpack(cls, data: bytes) -> 'FoconDisplayTextObject':
 		return cls(
 			spec=FoconDisplayDrawSpec.unpack(data[:16]),
-			flags=data[16],
+			alignment=FoconDisplayAlignment.unpack(data[16:17]),
 			font_size=data[17],
 			text=data[18:].rstrip(b'\x00').decode(Focon850.NAME),
 		)
@@ -772,8 +800,8 @@ class FoconDisplay:
 		return self.draw(values, height, spec)
 
 	# 004A
-	def print(self, message: str, spec: FoconDisplayDrawSpec) -> FoconDisplayDrawStatus:
-		obj = FoconDisplayTextObject(spec, message)
+	def print(self, message: str, spec: FoconDisplayDrawSpec, alignment: FoconDisplayAlignment | None = None) -> FoconDisplayDrawStatus:
+		obj = FoconDisplayTextObject(spec, message, alignment=alignment or FoconDisplayAlignment())
 		response = self.send_command(FoconDisplayCommand.DrawString, obj.pack())
 		return FoconDisplayDrawStatus.unpack(response)
 

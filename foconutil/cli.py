@@ -258,6 +258,24 @@ def main() -> None:
 		else:
 			return int(s)
 
+	def parse_alignment(s: str):
+		if '-' in s:
+			vs, hs = s.split('-', maxsplit=1)
+			va = FoconDisplayVerticalAlignment(vs)
+			ha = FoconDisplayHorizontalAlignment(hs)
+		elif s == 'center':
+			va = FoconDisplayVerticalAlignment(s)
+			ha = FoconDisplayHorizontalAlignment(s)
+		elif s in FoconDisplayVerticalAlignment:
+			va = FoconDisplayVerticalAlignment(s)
+			ha = FoconDisplayVerticalAlignment.Center
+		elif s in FoconDisplayHorizontalAlignment:
+			va = FoconDisplayVerticalAlignment.Center
+			ha = FoconDisplayHorizontalAlignment(s)
+		else:
+			raise ValueError('invalid alignment value: {}'.format(s))
+		return FoconDisplayAlignment(vertical=va, horizontal=ha)
+
 	def add_display_draw_object_args(parser):
 		add_display_draw_args(parser)
 		parser.add_argument('-n', '--count', type=int)
@@ -282,11 +300,12 @@ def main() -> None:
 	clear_parser.add_argument('OUTPUT', nargs='*')
 
 	def do_display_print(display, spec, args):
-		print(display.print(args.message, spec=spec))
+		print(display.print(args.message, spec=spec, alignment=args.alignment))
 
 	print_parser = display_subcommands.add_parser('print')
 	add_display_draw_object_args(print_parser)
 	print_parser.set_defaults(_display_draw_object_handler=do_display_print)
+	print_parser.add_argument('-a', '--alignment', type=parse_alignment, help='text alignment')
 	print_parser.add_argument('message')
 
 	def do_display_draw(display, spec, args):
