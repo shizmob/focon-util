@@ -379,7 +379,7 @@ def main() -> None:
 			def send_message(self, dest_id: int | None, data: bytes) -> None:
 				pass
 
-			def recv_message(self, checker=None) -> bytes:
+			def recv_message(self, peer_id, checker=None) -> bytes:
 				while True:
 					found = False
 					for f in self.frames:
