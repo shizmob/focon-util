@@ -1,4 +1,4 @@
-# NS SGMIII/SGMm displays
+# NS SGMm displays
 
 These comprise at least the following devices:
 - Focon 800222-01 ("INTERNAL DISPLAY SGMIII"): default configuration for reference in `ns-sgmiii.id.config.bin`

@@ -40,7 +40,7 @@ If the info command does not work, check your address pins and RS-485 connectivi
 ### Displays
 
 For supported displays, refer to the `docs/` folder for hardware set-up:
-- [NS SGMIII/SGMm internal and external display](docs/ns-sgmiii.md)
+- [NS SGMm internal and external display](docs/ns-sgmm.md)
 - [NS ICMm external display](docs/ns-icmm.md)
 
 If you want to verfify your display works at all, try bridging all adress pin pairs: upon startup, the display should then enter self-test mode.
