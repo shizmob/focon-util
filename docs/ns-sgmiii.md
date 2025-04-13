@@ -1,8 +1,8 @@
 # NS SGMIII/SGMm displays
 
 These comprise at least the following devices:
-- Focon 800222-01 ("INTERNAL DISPLAY SGMIII")
-- Focon 800224-01 ("EXTERNAL DISPLAY SGMIII")
+- Focon 800222-01 ("INTERNAL DISPLAY SGMIII"): default configuration for reference in `ns-sgmiii.id.config.bin`
+- Focon 800224-01 ("EXTERNAL DISPLAY SGMIII"): default configuration for reference in `ns-sgmiii.ed.config.bin`
 
 Supported displays will have two connectors on the side, labeled `X1` and `X2`, with the following pin-out:
 

@@ -1,7 +1,7 @@
 # NS ICMm displays
 
 These comprise at least the following devices:
-- Focon 800313-02 ("External Side Display (ESD)")
+- Focon 800313-02 ("External Side Display (ESD)"): default configuration for reference in `ns-icmm.esd.config.bin`
 
 Supported displays will have a single [Harting Han 24DD](https://www.harting.com/en-PE/p/Han-24DD-HMC-M-c-09162243001) connector on top, with the following pin-out:
 
