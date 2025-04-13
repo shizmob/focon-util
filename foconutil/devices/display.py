@@ -397,8 +397,8 @@ class FoconDisplayStatus:
 	power10_value:            int
 	available_still_objects:  int
 	available_scroll_objects: int
-	unk1_object_ids:          List[int]
-	unk2_object_ids:          List[int]
+	visible_object_ids:       List[int]
+	used_object_ids:          List[int]
 
 	@classmethod
 	def unpack(cls, data: bytes) -> 'FoconDisplayStatus':
@@ -413,8 +413,8 @@ class FoconDisplayStatus:
 			overall_adjust=data[9], # status5
 			available_still_objects=data[11], # status7
 			available_scroll_objects=data[12], # status8
-			unk1_object_ids=[data[14 + i] for i in range(data[13])],
-			unk2_object_ids=[data[38 + i] for i in range(data[37])],
+			visible_object_ids=[data[14 + i] for i in range(data[13])],
+			used_object_ids=[data[38 + i] for i in range(data[37])],
 		)
 
 class FoconDisplayDrawComposition(Enum):
