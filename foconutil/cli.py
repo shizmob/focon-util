@@ -102,8 +102,8 @@ def main() -> None:
 	def do_display_info(display, args):
 		device_info = display.get_display_info()
 		print('boot:')
-		print('  type:   ', device_info.kind)
 		print('  mode:   ', device_info.mode.name)
+		print('  type:   ', device_info.kind)
 		print('  version: {}.{:02}'.format(*device_info.boot_version))
 		print()
 
@@ -129,9 +129,7 @@ def main() -> None:
 			print('  name:   ', asset_data.name)
 			print('  version: {}.{:02}'.format(*asset_data.version))
 			print('  size:   ', asset_data.size)
-			print('  fonts:')
-			for font_id in range(asset_data.font_count):
-				print('    - font')
+			print('  fonts:  ', asset_data.font_count)
 			print()
 
 		if args.all or args.stats:
