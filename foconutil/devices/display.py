@@ -490,7 +490,7 @@ class FoconDisplayOutputSelector(Enum):
 	SingleArea = 2
 
 @dataclass
-class FoconDisplayClearSpecification:
+class FoconDisplayHideSpecification:
 	mode: FoconDisplayOutputSelector
 	output_id: int
 	x_start: int = 0
@@ -511,7 +511,7 @@ class FoconDisplayClearSpecification:
 		return b
 
 	@classmethod
-	def unpack(cls, data: bytes) -> 'FoconDisplayClearSpecification':
+	def unpack(cls, data: bytes) -> 'FoconDisplayHideSpecification':
 		return cls(
 			mode=FoconDisplayOutputSelector(data[0]),
 			output_id=data[1],
@@ -740,7 +740,7 @@ class FoconDisplay:
 		self.send_command(FoconDisplayCommand.SetUnk47, bytes([p1, p2]))
 
 	# 0048
-	def clear(self, output_ids: Optional[List[int]] = None, x: Optional[Tuple[int, int]] = None, y: Optional[Tuple[int, int]] = None) -> None:
+	def hide(self, output_ids: Optional[List[int]] = None, x: Optional[Tuple[int, int]] = None, y: Optional[Tuple[int, int]] = None) -> None:
 		config = self.get_current_config()
 
 		if x is not None and y is None:
@@ -753,7 +753,7 @@ class FoconDisplay:
 			y = (y, config.y_end)
 
 		if output_ids is None and x is None and y is None:
-			spec = FoconDisplayClearSpecification(
+			spec = FoconDisplayHideSpecification(
 				mode=FoconDisplayOutputSelector.AllFrom,
 				output_id=0,
 			)
@@ -765,7 +765,7 @@ class FoconDisplay:
 				if output_ids is None or i not in output_ids or x or y:
 					for output_id in range_ids:
 						if x and y:
-							spec = FoconDisplayClearSpecification(
+							spec = FoconDisplayHideSpecification(
 								mode=FoconDisplayOutputSelector.SingleArea,
 								output_id=output_id,
 								x_start=x[0],
@@ -774,14 +774,14 @@ class FoconDisplay:
 								y_end=y[1],
 							)
 						else:
-							spec = FoconDisplayClearSpecification(
+							spec = FoconDisplayHideSpecification(
 								mode=FoconDisplayOutputSelector.Single,
 								output_id=output_id,
 							)
 						self.send_command(FoconDisplayCommand.Clear, spec.pack())
 					range_ids = []
 			if range_ids:
-				spec = FoconDisplayClearSpecification(
+				spec = FoconDisplayHideSpecification(
 					mode=FoconDisplayOutputSelector.AllFrom,
 					output_ids=range_ids[0]
 				)

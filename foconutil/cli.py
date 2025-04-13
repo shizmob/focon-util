@@ -122,55 +122,46 @@ def main() -> None:
 			print('  unk29:  ', device_info.unk29)
 		print()
 
-		print('assets:')
-		asset_data = display.get_asset_data()
-		print('  part:   ', asset_data.part_id)
-		print('  name:   ', asset_data.name)
-		print('  version: {}.{:02}'.format(*asset_data.version))
-		print('  size:   ', asset_data.size)
-		print('  fonts:')
-		for font_id in range(asset_data.font_count):
-			print('    - font')
-		print()
+		if args.all or args.assets:
+			print('assets:')
+			asset_data = display.get_asset_data()
+			print('  part:   ', asset_data.part_id)
+			print('  name:   ', asset_data.name)
+			print('  version: {}.{:02}'.format(*asset_data.version))
+			print('  size:   ', asset_data.size)
+			print('  fonts:')
+			for font_id in range(asset_data.font_count):
+				print('    - font')
+			print()
 
-		print('stats:')
-		print('  memory: ', display.get_memory_stats())
-		print('  network:', display.get_network_stats())
-		print('  sensors:', display.get_sensor_stats())
-		print()
+		if args.all or args.stats:
+			print('stats:')
+			print('  memory: ', display.get_memory_stats())
+			print('  network:', display.get_network_stats())
+			print('  sensors:', display.get_sensor_stats())
+			print()
 
-		print('tasks:')
-		for t in display.get_task_stats():
-			print('  ' + t)
+		if args.all or args.tasks:
+			print('tasks:')
+			for t in display.get_task_stats():
+				print('  ' + t)
 
 	get_info_parser = display_subcommands.add_parser('info')
+	get_info_parser.add_argument('-a', '--all', action='store_true', default=False, help='show all extended information')
+	get_info_parser.add_argument('--assets', action='store_true', default=False, help='show extended asset information')
+	get_info_parser.add_argument('--stats',  action='store_true', default=False, help='show extended statistics')
+	get_info_parser.add_argument('--tasks',  action='store_true', default=False, help='show extended task information')
 	get_info_parser.set_defaults(_display_handler=do_display_info)
+
+	def do_display_status(display, args):
+		print(display.get_status())
+	get_status_parser = display_subcommands.add_parser('status')
+	get_status_parser.set_defaults(_display_handler=do_display_status)
 
 	def do_display_get_config(display, args):
 		print(display.get_current_config())
-	get_config_parser = display_subcommands.add_parser('get-config')
+	get_config_parser = display_subcommands.add_parser('config')
 	get_config_parser.set_defaults(_display_handler=do_display_get_config)
-
-	def do_display_memory_stats(display, args):
-		print(display.get_memory_stats())
-	get_memory_stats_parser = display_subcommands.add_parser('memory-stats')
-	get_memory_stats_parser.set_defaults(_display_handler=do_display_memory_stats)
-
-	def do_display_network_stats(display, args):
-		print(display.get_network_stats())
-	get_network_stats_parser = display_subcommands.add_parser('network-stats')
-	get_network_stats_parser.set_defaults(_display_handler=do_display_network_stats)
-
-	def do_display_sensor_stats(display, args):
-		print(display.get_sensor_stats())
-	get_sensor_stats_parser = display_subcommands.add_parser('sensor-stats')
-	get_sensor_stats_parser.set_defaults(_display_handler=do_display_sensor_stats)
-
-	def do_display_task_stats(display, args):
-		for stat in display.get_task_stats():
-			print('*', stat)
-	get_task_stats_parser = display_subcommands.add_parser('task-stats')
-	get_task_stats_parser.set_defaults(_display_handler=do_display_task_stats)
 
 	SELFTEST_TYPES = {
 		'info': FoconDisplaySelfTestKind.Info,
@@ -187,16 +178,6 @@ def main() -> None:
 		print(display.self_destruct())
 	selfdestruct_parser = display_subcommands.add_parser('selfdestruct')
 	selfdestruct_parser.set_defaults(_display_handler=do_display_selfdestruct)
-
-	def do_display_status(display, args):
-		print(display.get_status())
-	get_status_parser = display_subcommands.add_parser('status')
-	get_status_parser.set_defaults(_display_handler=do_display_status)
-
-	def do_display_product_info(display, args):
-		print(display.get_product_info())
-	get_product_info_parser = display_subcommands.add_parser('product-info')
-	get_product_info_parser.set_defaults(_display_handler=do_display_product_info)
 
 	# Display drawing commands
 
@@ -288,16 +269,16 @@ def main() -> None:
 		parser.add_argument('-H', '--height', type=int, help='Y size')
 		parser.set_defaults(_display_draw_handler=do_display_draw_object, _display_draw_object_handler=None)
 
-	def do_display_clear(display, args):
+	def do_display_hide(display, args):
 		for output_id in args.OUTPUT or [None]:
-			print(display.clear(output_id or None, x=args.x, y=args.y))
+			print(display.hide(output_id or None, x=args.x, y=args.y))
 
-	clear_parser = display_subcommands.add_parser('clear')
-	add_display_draw_args(clear_parser)
-	clear_parser.set_defaults(_display_draw_handler=do_display_clear)
-	clear_parser.add_argument('-x', '--x', type=parse_range, help='X area')
-	clear_parser.add_argument('-y', '--y', type=parse_range, help='Y area')
-	clear_parser.add_argument('OUTPUT', nargs='*')
+	hide_parser = display_subcommands.add_parser('hide')
+	add_display_draw_args(hide_parser)
+	hide_parser.set_defaults(_display_draw_handler=do_display_hide)
+	hide_parser.add_argument('-x', '--x', type=parse_range, help='X area')
+	hide_parser.add_argument('-y', '--y', type=parse_range, help='Y area')
+	hide_parser.add_argument('OUTPUT', nargs='*')
 
 	def do_display_print(display, spec, args):
 		print(display.print(args.message, spec=spec, font_size=args.font_size, alignment=args.alignment))
@@ -379,12 +360,6 @@ def main() -> None:
 	undraw_parser.set_defaults(_display_draw_handler=do_display_undraw)
 	undraw_parser.add_argument('ID', default=[255], type=int, nargs='*')
 	undraw_parser.add_argument('-N', '--no-update', action='store_false', dest='update', default=True)
-
-	def do_display_flood(display, args):
-		print(display.flood())
-	flood_parser = display_subcommands.add_parser('flood')
-	add_display_draw_args(flood_parser)
-	flood_parser.set_defaults(_display_draw_handler=do_display_flood)
 
 	# Debug commands
 
