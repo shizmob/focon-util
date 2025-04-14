@@ -1,3 +1,4 @@
+import sys
 import argparse
 import logging
 import time
@@ -8,7 +9,7 @@ except ImportError:
 	PIL = None
 
 from . import FoconFrame, FoconSerialTransport, FoconBus, FoconMessageBus, FoconDisplay
-from .devices.bootloader import FoconBootDevice
+from .devices.bootloader import FoconBootDevice, FoconBootHeader
 from .devices.display import *
 
 
@@ -46,6 +47,51 @@ def main() -> None:
 			print()
 	info_parser = subcommands.add_parser('info')
 	info_parser.set_defaults(_handler=do_info)
+
+	# Flash dump subcommands
+	flash_parser = subcommands.add_parser('flash')
+	flash_subcommands = flash_parser.add_subparsers(title='flash dump subcommands', required=True)
+
+	def do_flash_stitch(args):
+		while True:
+			for inp in args.INPUT:
+				chunk = inp.read(args.word_size)
+				if not chunk:
+					return
+				args.OUTPUT.write(chunk)
+
+	stitch_parser = flash_subcommands.add_parser('stitch')
+	stitch_parser.set_defaults(_handler=do_flash_stitch)
+	stitch_parser.add_argument('-w', '--word-size', metavar='N', type=int, default=1, help='amount of bytes in each chunk')
+	stitch_parser.add_argument('OUTPUT', type=argparse.FileType('wb'), help='output file')
+	stitch_parser.add_argument('INPUT', nargs='+', type=argparse.FileType('rb'), help='input file')
+
+	def do_flash_unpack(args):
+		args.INPUT.seek(args.boot_offset)
+
+		bootloader = args.INPUT.read(args.app_offset - args.boot_offset)
+		args.BOOTOUT.write(bootloader)
+
+		app_header_data = args.INPUT.read(FoconBootHeader.sizeof())
+		app_header = FoconBootHeader.unpack(app_header_data)
+
+		args.INPUT.seek(app_header.start_address)
+		app = args.INPUT.read(app_header.size)
+		if not app_header.verify(app):
+			print('error: app data is corrupt', file=sys.stderr)
+			sys.exit(1)
+
+		new_header = FoconBootHeader.generate(app, args.app_offset + FoconBootHeader.sizeof())
+		args.APPOUT.write(new_header.pack())
+		args.APPOUT.write(app)
+
+	unpack_parser = flash_subcommands.add_parser('unpack')
+	unpack_parser.set_defaults(_handler=do_flash_unpack)
+	unpack_parser.add_argument('--boot-offset', type=int, metavar='OFFSET', default=0x0, help='bootloader offset in dump')
+	unpack_parser.add_argument('-o', '--app-offset', type=int, metavar='OFFSET', default=0x7000, help='application offset in dump')
+	unpack_parser.add_argument('INPUT', type=argparse.FileType('rb'), help='stitched flash dump')
+	unpack_parser.add_argument('BOOTOUT', type=argparse.FileType('wb'), help='extracted bootloader')
+	unpack_parser.add_argument('APPOUT', type=argparse.FileType('wb'), help='extracted application')
 
 	# Bootloader subcommands
 

@@ -1,9 +1,45 @@
 from enum import Enum
 from dataclasses import dataclass
-from struct import pack
+from struct import pack, unpack
+import crcmod
 
 from .device import FoconDevice, FoconDeviceInfo, dangerous
 
+CRC = crcmod.mkCrcFun(0x18005, 0x0, False)
+
+
+@dataclass
+class FoconBootHeader:
+	checksum: int
+	start_address: int
+	end_address: int
+
+	@property
+	def size(self):
+		return self.end_address - self.start_address + 1
+
+	@classmethod
+	def sizeof(cls) -> int:
+		return 10
+
+	def pack(self) -> bytes:
+		return pack('>HII', self.checksum, self.start_address, self.end_address)
+
+	@classmethod
+	def unpack(cls, data: bytes) -> 'Self':
+		crc, start, end = unpack('>HII', data[:10])
+		return cls(checksum=crc, start_address=start, end_address=end)
+
+	@classmethod
+	def generate(cls, data: bytes, start_address: int) -> 'Self':
+		return cls(
+			checksum=CRC(data),
+			start_address=start_address,
+			end_address=start_address + len(data) - 1,
+		)
+
+	def verify(self, data: bytes) -> bool:
+		return CRC(data) == self.checksum
 
 class FoconBootCommand(Enum):
 	WriteFlash = 0x00F0
