@@ -24,10 +24,10 @@ def main() -> None:
 	p.add_argument('-i', '--id', type=int, default=0, help='device ID')
 	p.set_defaults(_handler=None)
 
-	subcommands = p.add_subparsers(title='subcommands', required=True)
+	commands = p.add_subparsers(title='commands', metavar='COMMAND', required=True)
 
 
-	# General subcommands
+	# General commands
 
 	def do_info(args):
 		transport = FoconSerialTransport(args.device, baudrate=args.baudrate, xtal=args.crystal, flow_control=args.flow_control, debug=args.debug > 2)
@@ -45,96 +45,10 @@ def main() -> None:
 			print('app:')
 			print('  version: {}.{:02}'.format(*device_info.app_version))
 			print()
-	info_parser = subcommands.add_parser('info')
+	info_parser = commands.add_parser('info', help='query basic information from Focon device')
 	info_parser.set_defaults(_handler=do_info)
 
-	# Flash dump subcommands
-	flash_parser = subcommands.add_parser('flash')
-	flash_subcommands = flash_parser.add_subparsers(title='flash dump subcommands', required=True)
-
-	def do_flash_stitch(args):
-		while True:
-			for inp in args.CHUNK:
-				chunk = inp.read(args.word_size)
-				if not chunk:
-					return
-				args.OUTPUT.write(chunk)
-
-	stitch_parser = flash_subcommands.add_parser('stitch')
-	stitch_parser.set_defaults(_handler=do_flash_stitch)
-	stitch_parser.add_argument('-w', '--word-size', metavar='N', type=int, default=1, help='amount of bytes in each chunk')
-	stitch_parser.add_argument('OUTPUT', type=argparse.FileType('wb'), help='stitched file')
-	stitch_parser.add_argument('CHUNK', nargs='+', type=argparse.FileType('rb'), help='chunk file(s)')
-
-	def do_flash_unstitch(args):
-		while True:
-			for outp in args.CHUNK:
-				chunk = args.INPUT.read(args.word_size)
-				if not chunk:
-					return
-				outp.write(chunk)
-
-	unstitch_parser = flash_subcommands.add_parser('unstitch')
-	unstitch_parser.set_defaults(_handler=do_flash_unstitch)
-	unstitch_parser.add_argument('-w', '--word-size', metavar='N', type=int, default=1, help='amount of bytes in each chunk')
-	unstitch_parser.add_argument('INPUT', type=argparse.FileType('wb'), help='stitched file')
-	unstitch_parser.add_argument('CHUNK', nargs='+', type=argparse.FileType('rb'), help='chunk file(s)')
-
-	def do_flash_pack(args):
-		args.OUTPUT.truncate(args.boot_offset)
-		args.OUTPUT.seek(args.boot_offset)
-
-		bootloader = args.BOOTFILE.read()
-		args.OUTPUT.write(bootloader)
-
-		app_header_data = args.APPFILE.read(FoconBootHeader.sizeof())
-		app_header = FoconBootHeader.unpack(app_header_data)
-		app = args.APPFILE.read(app_header.size)
-		if not app_header.verify(app):
-			print('error: app data is corrupt', file=sys.stderr)
-			sys.exit(1)
-
-		new_header = FoconBootHeader.generate(app, args.boot_offset + app_header.start_address)
-		args.OUTPUT.truncate(new_header.start_address - FoconBootHeader.sizeof())
-		args.OUTPUT.seek(new_header.start_address - FoconBootHeader.sizeof())
-		args.OUTPUT.write(new_header.pack())
-		args.OUTPUT.write(app)
-
-	pack_parser = flash_subcommands.add_parser('pack')
-	pack_parser.set_defaults(_handler=do_flash_pack)
-	pack_parser.add_argument('--boot-offset', type=int, metavar='OFFSET', default=0x0, help='bootloader offset in dump')
-	pack_parser.add_argument('BOOTFILE', type=argparse.FileType('rb'))
-	pack_parser.add_argument('APPFILE', type=argparse.FileType('rb'))
-	pack_parser.add_argument('OUTPUT', type=argparse.FileType('wb'))
-
-	def do_flash_unpack(args):
-		args.INPUT.seek(args.boot_offset)
-
-		bootloader = args.INPUT.read(args.app_offset - args.boot_offset)
-		args.BOOTOUT.write(bootloader)
-
-		app_header_data = args.INPUT.read(FoconBootHeader.sizeof())
-		app_header = FoconBootHeader.unpack(app_header_data)
-
-		args.INPUT.seek(app_header.start_address)
-		app = args.INPUT.read(app_header.size)
-		if not app_header.verify(app):
-			print('error: app data is corrupt', file=sys.stderr)
-			sys.exit(1)
-
-		new_header = FoconBootHeader.generate(app, args.app_offset + FoconBootHeader.sizeof())
-		args.APPOUT.write(new_header.pack())
-		args.APPOUT.write(app)
-
-	unpack_parser = flash_subcommands.add_parser('unpack')
-	unpack_parser.set_defaults(_handler=do_flash_unpack)
-	unpack_parser.add_argument('--boot-offset', type=int, metavar='OFFSET', default=0x0, help='bootloader offset in dump')
-	unpack_parser.add_argument('-o', '--app-offset', type=int, metavar='OFFSET', default=0x7000, help='application offset in dump')
-	unpack_parser.add_argument('INPUT', type=argparse.FileType('rb'), help='stitched flash dump')
-	unpack_parser.add_argument('BOOTOUT', type=argparse.FileType('wb'), help='extracted bootloader')
-	unpack_parser.add_argument('APPOUT', type=argparse.FileType('wb'), help='extracted application')
-
-	# Bootloader subcommands
+	# Bootloader commands
 
 	def do_bootloader(args):
 		transport = FoconSerialTransport(args.device, baudrate=args.baudrate, xtal=args.crystal, flow_control=args.flow_control, debug=args.debug > 2)
@@ -144,15 +58,15 @@ def main() -> None:
 		bootloader = FoconBootDevice(device)
 
 		args._bootloader_handler(bootloader, args)
-	bootloader_parser = subcommands.add_parser('boot')
+	bootloader_parser = commands.add_parser('boot', help='commands to interact with the bootloader of Focon devices')
 	bootloader_parser.set_defaults(_handler=do_bootloader, _bootloader_handler=None)
-	bootloader_subcommands = bootloader_parser.add_subparsers(title='boot loader subcommands', required=True)
+	bootloader_subcommands = bootloader_parser.add_subparsers(title='boot loader subcommands', metavar='SUBCOMMAND', required=True)
 
 	def do_flash_app(bootloader, args):
 		for offset in bootloader.write_app(args.APP.read()):
 			print('Flashing: {:08x}...'.format(offset))
 
-	flash_app_parser = bootloader_subcommands.add_parser('flash')
+	flash_app_parser = bootloader_subcommands.add_parser('flash', help='write new application to device flash')
 	flash_app_parser.add_argument('APP', type=argparse.FileType('rb'))
 	flash_app_parser.set_defaults(_bootloader_handler=do_flash_app)
 
@@ -160,7 +74,7 @@ def main() -> None:
 		for offset in bootloader.write_flash(args.ADDRESS, args.DATA.read()):
 			print('Flashing: {:08x}...'.format(offset))
 
-	flash_block_parser = bootloader_subcommands.add_parser('flash-block')
+	flash_block_parser = bootloader_subcommands.add_parser('flash-block', help='write chunk of device flash')
 	flash_block_parser.add_argument('ADDRESS', type=int, help='address to flash')
 	flash_block_parser.add_argument('DATA', type=argparse.FileType('rb'))
 	flash_block_parser.set_defaults(_bootloader_handler=do_flash_block)
@@ -169,10 +83,10 @@ def main() -> None:
 		if not bootloader.launch():
 			return 1
 
-	launch_parser = bootloader_subcommands.add_parser('launch')
+	launch_parser = bootloader_subcommands.add_parser('launch', help='load and run application in device flash')
 	launch_parser.set_defaults(_bootloader_handler=do_launch)
 
-	# Display subcommands
+	# Display commands
 
 	def do_display(args):
 		transport = FoconSerialTransport(args.device, baudrate=args.baudrate, xtal=args.crystal, flow_control=args.flow_control, debug=args.debug > 2)
@@ -182,9 +96,9 @@ def main() -> None:
 		display = FoconDisplay(device)
 
 		args._display_handler(display, args)
-	display_parser = subcommands.add_parser('display')
+	display_parser = commands.add_parser('display', help='commands to interact with Focon display devices')
 	display_parser.set_defaults(_handler=do_display, _display_handler=None)
-	display_subcommands = display_parser.add_subparsers(title='display subcommands', required=True)
+	display_subcommands = display_parser.add_subparsers(title='display subcommands', metavar='SUBCOMMAND', required=True)
 
 	def do_display_info(display, args):
 		device_info = display.get_display_info()
@@ -231,7 +145,7 @@ def main() -> None:
 			for t in display.get_task_stats():
 				print('  ' + t)
 
-	get_info_parser = display_subcommands.add_parser('info')
+	get_info_parser = display_subcommands.add_parser('info', help='query extended information from Focon display devices')
 	get_info_parser.add_argument('-a', '--all', action='store_true', default=False, help='show all extended information')
 	get_info_parser.add_argument('--assets', action='store_true', default=False, help='show extended asset information')
 	get_info_parser.add_argument('--stats',  action='store_true', default=False, help='show extended statistics')
@@ -240,12 +154,12 @@ def main() -> None:
 
 	def do_display_status(display, args):
 		print(display.get_status())
-	get_status_parser = display_subcommands.add_parser('status')
+	get_status_parser = display_subcommands.add_parser('status', help='query status of Focon display device')
 	get_status_parser.set_defaults(_display_handler=do_display_status)
 
 	def do_display_get_config(display, args):
 		print(display.get_current_config())
-	get_config_parser = display_subcommands.add_parser('config')
+	get_config_parser = display_subcommands.add_parser('config', help='query factory configuration of Focon display device')
 	get_config_parser.set_defaults(_display_handler=do_display_get_config)
 
 	SELFTEST_TYPES = {
@@ -255,13 +169,13 @@ def main() -> None:
 	}
 	def do_display_selftest(display, args):
 		print(display.trigger_selftest(SELFTEST_TYPES[args.type]))
-	selftest_parser = display_subcommands.add_parser('selftest')
+	selftest_parser = display_subcommands.add_parser('selftest', help='enter or leave self-test mode')
 	selftest_parser.set_defaults(_display_handler=do_display_selftest)
 	selftest_parser.add_argument('type', choices=tuple(SELFTEST_TYPES))
 
 	def do_display_selfdestruct(display, args):
 		print(display.self_destruct())
-	selfdestruct_parser = display_subcommands.add_parser('selfdestruct')
+	selfdestruct_parser = display_subcommands.add_parser('selfdestruct', help='erase application from flash and enter bootloader mode')
 	selfdestruct_parser.set_defaults(_display_handler=do_display_selfdestruct)
 
 	# Display drawing commands
@@ -358,7 +272,7 @@ def main() -> None:
 		for output_id in args.OUTPUT or [None]:
 			print(display.hide(output_id or None, x=args.x, y=args.y))
 
-	hide_parser = display_subcommands.add_parser('hide')
+	hide_parser = display_subcommands.add_parser('hide', help='hide pixels in given area on display')
 	add_display_draw_args(hide_parser)
 	hide_parser.set_defaults(_display_draw_handler=do_display_hide)
 	hide_parser.add_argument('-x', '--x', type=parse_range, help='X area')
@@ -368,7 +282,7 @@ def main() -> None:
 	def do_display_print(display, spec, args):
 		print(display.print(args.message, spec=spec, font_size=args.font_size, alignment=args.alignment))
 
-	print_parser = display_subcommands.add_parser('print')
+	print_parser = display_subcommands.add_parser('print', help='draw text object to display')
 	add_display_draw_object_args(print_parser)
 	print_parser.set_defaults(_display_draw_object_handler=do_display_print)
 	print_parser.add_argument('-a', '--alignment', type=parse_alignment, help='text alignment')
@@ -416,7 +330,7 @@ def main() -> None:
 
 			n += 1
 
-	draw_parser = display_subcommands.add_parser('draw')
+	draw_parser = display_subcommands.add_parser('draw', help='draw bitmap to display')
 	add_display_draw_object_args(draw_parser)
 	draw_parser.set_defaults(_display_draw_object_handler=do_display_draw)
 	draw_parser.add_argument('file', type=argparse.FileType('rb'))
@@ -424,7 +338,7 @@ def main() -> None:
 	def do_display_fill(display, spec, args):
 		print(display.fill(spec, bool(args.VALUE)))
 
-	fill_parser = display_subcommands.add_parser('fill')
+	fill_parser = display_subcommands.add_parser('fill', help='fill given area on display')
 	add_display_draw_object_args(fill_parser)
 	fill_parser.set_defaults(_display_draw_object_handler=do_display_fill)
 	fill_parser.add_argument('VALUE', type=int, nargs='?', default=1)
@@ -432,7 +346,7 @@ def main() -> None:
 	def do_display_redraw(display, args):
 		print(display.redraw(args.ID, composition=args.composition))
 
-	redraw_parser = display_subcommands.add_parser('redraw')
+	redraw_parser = display_subcommands.add_parser('redraw', help='redraw objects on display')
 	add_display_draw_args(redraw_parser)
 	redraw_parser.set_defaults(_display_draw_handler=do_display_redraw)
 	redraw_parser.add_argument('ID', default=[255], type=int, nargs='*')
@@ -440,7 +354,7 @@ def main() -> None:
 	def do_display_undraw(display, args):
 		print(display.undraw(args.ID, update_screen=args.update))
 
-	undraw_parser = display_subcommands.add_parser('undraw')
+	undraw_parser = display_subcommands.add_parser('undraw', help='remove objects from display')
 	add_display_draw_args(undraw_parser)
 	undraw_parser.set_defaults(_display_draw_handler=do_display_undraw)
 	undraw_parser.add_argument('ID', default=[255], type=int, nargs='*')
@@ -448,7 +362,7 @@ def main() -> None:
 
 	# Debug commands
 
-	debug_parser = subcommands.add_parser('debug')
+	debug_parser = commands.add_parser('debug', help='commands for low-level tool debugging')
 	debug_subcommands = debug_parser.add_subparsers(title='debug subcommands', required=True)
 
 	def do_self_test(args):
@@ -485,8 +399,95 @@ def main() -> None:
 			b'abcde'.ljust(0x33-0x28, b'\x00') +
 			b'lel'.ljust(0x44-0x33, b'\x00')
 		))
-	self_test_parser = debug_subcommands.add_parser('self-test')
+	self_test_parser = debug_subcommands.add_parser('self-test', help='sanity-check own message bus implementation')
 	self_test_parser.set_defaults(_handler=do_self_test)
+
+	# Flash dump commands
+	flash_parser = commands.add_parser('flash', help='commands to process flash memory dumps of Focon devices')
+	flash_subcommands = flash_parser.add_subparsers(title='flash memory subcommands', required=True)
+
+	def do_flash_stitch(args):
+		while True:
+			for inp in args.CHUNK:
+				chunk = inp.read(args.word_size)
+				if not chunk:
+					return
+				args.OUTPUT.write(chunk)
+
+	stitch_parser = flash_subcommands.add_parser('stitch', help='combine multi-chip flash dumps into single flash image')
+	stitch_parser.set_defaults(_handler=do_flash_stitch)
+	stitch_parser.add_argument('-w', '--word-size', metavar='N', type=int, default=1, help='amount of bytes in each chunk')
+	stitch_parser.add_argument('OUTPUT', type=argparse.FileType('wb'), help='stitched file')
+	stitch_parser.add_argument('CHUNK', nargs='+', type=argparse.FileType('rb'), help='chunk file(s)')
+
+	def do_flash_unstitch(args):
+		while True:
+			for outp in args.CHUNK:
+				chunk = args.INPUT.read(args.word_size)
+				if not chunk:
+					return
+				outp.write(chunk)
+
+	unstitch_parser = flash_subcommands.add_parser('unstitch', help='seperate single flash image into multi-chip flash dumps')
+	unstitch_parser.set_defaults(_handler=do_flash_unstitch)
+	unstitch_parser.add_argument('-w', '--word-size', metavar='N', type=int, default=1, help='amount of bytes in each chunk')
+	unstitch_parser.add_argument('INPUT', type=argparse.FileType('wb'), help='stitched file')
+	unstitch_parser.add_argument('CHUNK', nargs='+', type=argparse.FileType('rb'), help='chunk file(s)')
+
+	def do_flash_pack(args):
+		args.OUTPUT.truncate(args.boot_offset)
+		args.OUTPUT.seek(args.boot_offset)
+
+		bootloader = args.BOOTFILE.read()
+		args.OUTPUT.write(bootloader)
+
+		app_header_data = args.APPFILE.read(FoconBootHeader.sizeof())
+		app_header = FoconBootHeader.unpack(app_header_data)
+		app = args.APPFILE.read(app_header.size)
+		if not app_header.verify(app):
+			print('error: app data is corrupt', file=sys.stderr)
+			sys.exit(1)
+
+		new_header = FoconBootHeader.generate(app, args.boot_offset + app_header.start_address)
+		args.OUTPUT.truncate(new_header.start_address - FoconBootHeader.sizeof())
+		args.OUTPUT.seek(new_header.start_address - FoconBootHeader.sizeof())
+		args.OUTPUT.write(new_header.pack())
+		args.OUTPUT.write(app)
+
+	pack_parser = flash_subcommands.add_parser('pack', description='pack bootloader and application into flash image')
+	pack_parser.set_defaults(_handler=do_flash_pack)
+	pack_parser.add_argument('--boot-offset', type=int, metavar='OFFSET', default=0x0, help='bootloader offset in dump')
+	pack_parser.add_argument('BOOTFILE', type=argparse.FileType('rb'))
+	pack_parser.add_argument('APPFILE', type=argparse.FileType('rb'))
+	pack_parser.add_argument('OUTPUT', type=argparse.FileType('wb'))
+
+	def do_flash_unpack(args):
+		args.INPUT.seek(args.boot_offset)
+
+		bootloader = args.INPUT.read(args.app_offset - args.boot_offset)
+		args.BOOTOUT.write(bootloader)
+
+		app_header_data = args.INPUT.read(FoconBootHeader.sizeof())
+		app_header = FoconBootHeader.unpack(app_header_data)
+
+		args.INPUT.seek(app_header.start_address)
+		app = args.INPUT.read(app_header.size)
+		if not app_header.verify(app):
+			print('error: app data is corrupt', file=sys.stderr)
+			sys.exit(1)
+
+		new_header = FoconBootHeader.generate(app, args.app_offset + FoconBootHeader.sizeof())
+		args.APPOUT.write(new_header.pack())
+		args.APPOUT.write(app)
+
+	unpack_parser = flash_subcommands.add_parser('unpack', description='extract bootloader and application from flash image')
+	unpack_parser.set_defaults(_handler=do_flash_unpack)
+	unpack_parser.add_argument('--boot-offset', type=int, metavar='OFFSET', default=0x0, help='bootloader offset in dump')
+	unpack_parser.add_argument('-o', '--app-offset', type=int, metavar='OFFSET', default=0x7000, help='application offset in dump')
+	unpack_parser.add_argument('INPUT', type=argparse.FileType('rb'), help='stitched flash dump')
+	unpack_parser.add_argument('BOOTOUT', type=argparse.FileType('wb'), help='extracted bootloader')
+	unpack_parser.add_argument('APPOUT', type=argparse.FileType('wb'), help='extracted application')
+
 
 	args = p.parse_args()
 	root_logger = logging.getLogger()
