@@ -56,20 +56,20 @@ Testing so far indicates it also works without this termination resistor at reas
 The firmware programs a clock divisor in the communication chip (UART transceiver) to obtain the standard 57.6 kbaud/s communication speed.
 By tweaking this divisor, it's possible to bump the communication speed, and thus the maximum framerate, to 115.2 kbaud/s.
 
-A [binary patch for application version 1.31](ns-icmm.app.131-baud115k.xd3) is available. Given the application extracted from a flash dump (using `focon-util flash unpack`), it can be applied using `xdelta3`:
+A [binary patch for application version 1.31](ns-icmm.esd.app-131-baud115k.xd3) is available. Given the application extracted from a flash dump (using `focon-util flash unpack`), it can be applied using `xdelta3`:
 
 ```sh
-xdelta3 -d -s ns-icmm.app.131.bin ns-icmm.app.131-baud115k.xd3 ns-icmm.app.131-baud115k.bin
+xdelta3 -d -s ns-icmm.esd.app-131.bin ns-icmm.esd.app-131-baud115k.xd3 ns-icmm.esd.app-131-baud115k.bin
 ```
 
 The modified application can then be flashed through `focon-util`:
 
 ```sh
-focon-util display selfdestruct                     # erase existing application
-focon-util info                                     # ensure the device is now in bootloader mode
-focon-util boot flash ns-icmm.app.131-baud115k.bin  # flash new application
-focon-util boot launch                              # boot into new application
-focon-util -b 115200 info                           # ensure the device is in application mode and responding at 115.2 kbaud/s
+focon-util display selfdestruct                         # erase existing application
+focon-util info                                         # ensure the device is now in bootloader mode
+focon-util boot flash ns-icmm.esd.app-131-baud115k.bin  # flash new application
+focon-util boot launch                                  # boot into new application
+focon-util -b 115200 info                               # ensure the device is in application mode and responding at 115.2 kbaud/s
 ```
 
 Once successful, the `-b <BAUDRATE>` argument can be used (*before any subcommand*) to communicate with the device.
