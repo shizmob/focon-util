@@ -54,7 +54,7 @@ def main() -> None:
 
 	def do_flash_stitch(args):
 		while True:
-			for inp in args.INPUT:
+			for inp in args.CHUNK:
 				chunk = inp.read(args.word_size)
 				if not chunk:
 					return
@@ -63,8 +63,49 @@ def main() -> None:
 	stitch_parser = flash_subcommands.add_parser('stitch')
 	stitch_parser.set_defaults(_handler=do_flash_stitch)
 	stitch_parser.add_argument('-w', '--word-size', metavar='N', type=int, default=1, help='amount of bytes in each chunk')
-	stitch_parser.add_argument('OUTPUT', type=argparse.FileType('wb'), help='output file')
-	stitch_parser.add_argument('INPUT', nargs='+', type=argparse.FileType('rb'), help='input file')
+	stitch_parser.add_argument('OUTPUT', type=argparse.FileType('wb'), help='stitched file')
+	stitch_parser.add_argument('CHUNK', nargs='+', type=argparse.FileType('rb'), help='chunk file(s)')
+
+	def do_flash_unstitch(args):
+		while True:
+			for outp in args.CHUNK:
+				chunk = args.INPUT.read(args.word_size)
+				if not chunk:
+					return
+				outp.write(chunk)
+
+	unstitch_parser = flash_subcommands.add_parser('unstitch')
+	unstitch_parser.set_defaults(_handler=do_flash_unstitch)
+	unstitch_parser.add_argument('-w', '--word-size', metavar='N', type=int, default=1, help='amount of bytes in each chunk')
+	unstitch_parser.add_argument('INPUT', type=argparse.FileType('wb'), help='stitched file')
+	unstitch_parser.add_argument('CHUNK', nargs='+', type=argparse.FileType('rb'), help='chunk file(s)')
+
+	def do_flash_pack(args):
+		args.OUTPUT.truncate(args.boot_offset)
+		args.OUTPUT.seek(args.boot_offset)
+
+		bootloader = args.BOOTFILE.read()
+		args.OUTPUT.write(bootloader)
+
+		app_header_data = args.APPFILE.read(FoconBootHeader.sizeof())
+		app_header = FoconBootHeader.unpack(app_header_data)
+		app = args.APPFILE.read(app_header.size)
+		if not app_header.verify(app):
+			print('error: app data is corrupt', file=sys.stderr)
+			sys.exit(1)
+
+		new_header = FoconBootHeader.generate(app, args.boot_offset + app_header.start_address)
+		args.OUTPUT.truncate(new_header.start_address - FoconBootHeader.sizeof())
+		args.OUTPUT.seek(new_header.start_address - FoconBootHeader.sizeof())
+		args.OUTPUT.write(new_header.pack())
+		args.OUTPUT.write(app)
+
+	pack_parser = flash_subcommands.add_parser('pack')
+	pack_parser.set_defaults(_handler=do_flash_pack)
+	pack_parser.add_argument('--boot-offset', type=int, metavar='OFFSET', default=0x0, help='bootloader offset in dump')
+	pack_parser.add_argument('BOOTFILE', type=argparse.FileType('rb'))
+	pack_parser.add_argument('APPFILE', type=argparse.FileType('rb'))
+	pack_parser.add_argument('OUTPUT', type=argparse.FileType('wb'))
 
 	def do_flash_unpack(args):
 		args.INPUT.seek(args.boot_offset)
