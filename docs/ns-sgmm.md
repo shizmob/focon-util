@@ -74,3 +74,15 @@ focon-util -b 115200 info                                # ensure the device is 
 
 Once successful, the `-b <BAUDRATE>` argument can be used (*before any subcommand*) to communicate with the device.
 Note that if the device is in bootloader mode, it will still use the original 57.6 kbaud/s speed.
+
+## Hardware modifications
+
+### UART crystal
+
+The communication chip (UART transceiver) is paired to a dedicated clock crystal, which can be replaced to obtain a higher communication rate,
+and thus a higher framerate. Refer to [the corresponding ICMm display documentation](ns-icmm.md#uart-crystal) for details!
+
+### SoC crystal
+
+The main processor (SoC) is paired to a clock crystal running at 16 MHz, which can be replaced for a modest speed increase.
+Refer to the [corresponding ICMm display documentation](ns-icmm.md#soc-crystal) for details!
